@@ -1,4 +1,4 @@
-name: Build DustinBot V2.1
+name: Build DustinBot V3
 
 on:
   workflow_dispatch:
@@ -11,17 +11,21 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Create project
+      - name: Create Android project
         shell: bash
         run: |
           set -e
+
           rm -rf app build.gradle settings.gradle gradle.properties
+
           mkdir -p app/src/main/java/com/dustinbot/v2
-          mkdir -p app/src/main/res/xml app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/values
 
           cat > settings.gradle <<'EOF'
           pluginManagement {
@@ -31,11 +35,16 @@ jobs:
                   gradlePluginPortal()
               }
           }
+
           dependencyResolutionManagement {
               repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories { google(); mavenCentral() }
+              repositories {
+                  google()
+                  mavenCentral()
+              }
           }
-          rootProject.name = "DustinBotV2"
+
+          rootProject.name = "DustinBotV3"
           include(":app")
           EOF
 
@@ -51,7 +60,9 @@ jobs:
           EOF
 
           cat > app/build.gradle <<'EOF'
-          plugins { id 'com.android.application' }
+          plugins {
+              id 'com.android.application'
+          }
 
           android {
               namespace 'com.dustinbot.v2'
@@ -61,16 +72,16 @@ jobs:
                   applicationId 'com.dustinbot.v2'
                   minSdk 26
                   targetSdk 35
-                  versionCode 21
-                  versionName '2.1'
+                  versionCode 30
+                  versionName '3.0'
               }
           }
           EOF
 
           cat > app/src/main/res/values/strings.xml <<'EOF'
           <resources>
-              <string name="app_name">Dustin Bot V2.1</string>
-              <string name="accessibility_description">Dustin Bot V2 control service</string>
+              <string name="app_name">Dustin Bot V3</string>
+              <string name="accessibility_description">Dustin Bot V3 control service</string>
           </resources>
           EOF
 
@@ -102,8 +113,7 @@ jobs:
 
               <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
               <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-              <uses-permission
-                  android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
 
               <application
                   android:theme="@style/AppTheme"
@@ -114,20 +124,23 @@ jobs:
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
                       </intent-filter>
+
                   </activity>
 
                   <service
                       android:name=".BotAccessibilityService"
                       android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
                       android:exported="false">
+
                       <intent-filter>
-                          <action
-                              android:name="android.accessibilityservice.AccessibilityService"/>
+                          <action android:name="android.accessibilityservice.AccessibilityService"/>
                       </intent-filter>
+
                       <meta-data
                           android:name="android.accessibilityservice"
                           android:resource="@xml/accessibility_service_config"/>
@@ -141,6 +154,7 @@ jobs:
                       android:name=".CaptureService"
                       android:exported="false"
                       android:foregroundServiceType="mediaProjection"/>
+
               </application>
           </manifest>
           EOF
@@ -196,8 +210,11 @@ jobs:
           cat > app/src/main/java/com/dustinbot/v2/CaptureService.java <<'EOF'
           package com.dustinbot.v2;
 
-          import android.app.*;
-          import android.content.*;
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
           import android.graphics.Bitmap;
           import android.hardware.display.DisplayManager;
           import android.hardware.display.VirtualDisplay;
@@ -205,8 +222,12 @@ jobs:
           import android.media.ImageReader;
           import android.media.projection.MediaProjection;
           import android.media.projection.MediaProjectionManager;
-          import android.os.*;
+          import android.os.Build;
+          import android.os.Handler;
+          import android.os.HandlerThread;
+          import android.os.IBinder;
           import android.util.DisplayMetrics;
+
           import java.nio.ByteBuffer;
 
           public class CaptureService extends Service {
@@ -229,7 +250,7 @@ jobs:
 
                   Notification n =
                       new Notification.Builder(this, CHANNEL)
-                          .setContentTitle("Dustin Bot V2.1")
+                          .setContentTitle("Dustin Bot V3")
                           .setContentText("Screen capture active")
                           .setSmallIcon(android.R.drawable.ic_menu_view)
                           .build();
@@ -248,8 +269,7 @@ jobs:
 
                           MediaProjectionManager m =
                               (MediaProjectionManager)
-                              getSystemService(
-                                  MEDIA_PROJECTION_SERVICE);
+                                  getSystemService(MEDIA_PROJECTION_SERVICE);
 
                           projection =
                               m.getMediaProjection(result, data);
@@ -267,9 +287,9 @@ jobs:
                   DisplayMetrics dm =
                       getResources().getDisplayMetrics();
 
-                  int w = dm.widthPixels;
-                  int h = dm.heightPixels;
-                  int d = dm.densityDpi;
+                  final int w = dm.widthPixels;
+                  final int h = dm.heightPixels;
+                  final int d = dm.densityDpi;
 
                   thread =
                       new HandlerThread("DustinCapture");
@@ -301,8 +321,7 @@ jobs:
 
                       try {
 
-                          image =
-                              r.acquireLatestImage();
+                          image = r.acquireLatestImage();
 
                           if (image == null)
                               return;
@@ -325,8 +344,7 @@ jobs:
 
                           Bitmap full =
                               Bitmap.createBitmap(
-                                  w + rowPadding /
-                                      pixelStride,
+                                  w + rowPadding / pixelStride,
                                   h,
                                   Bitmap.Config.ARGB_8888);
 
@@ -343,7 +361,6 @@ jobs:
                           full.recycle();
 
                           Bitmap old = latest;
-
                           latest = crop;
 
                           if (old != null)
@@ -367,8 +384,7 @@ jobs:
                           w,
                           h,
                           d,
-                          DisplayManager
-                              .VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                          DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
                           reader.getSurface(),
                           null,
                           handler);
@@ -419,12 +435,10 @@ jobs:
                           new NotificationChannel(
                               CHANNEL,
                               "Dustin Bot Capture",
-                              NotificationManager
-                                  .IMPORTANCE_LOW);
+                              NotificationManager.IMPORTANCE_LOW);
 
                       ((NotificationManager)
-                          getSystemService(
-                              NOTIFICATION_SERVICE))
+                          getSystemService(NOTIFICATION_SERVICE))
                           .createNotificationChannel(c);
                   }
               }
@@ -469,9 +483,7 @@ jobs:
                       return null;
 
                   int sampleStep =
-                      Math.max(
-                          1,
-                          Math.min(tw, th) / 10);
+                      Math.max(2, Math.min(tw, th) / 10);
 
                   double best =
                       Double.MAX_VALUE;
@@ -479,28 +491,27 @@ jobs:
                   int bx = -1;
                   int by = -1;
 
-                  for (
-                      int y = 0;
-                      y <= screen.getHeight() - th;
-                      y += Math.max(2, step)) {
+                  int scanStep =
+                      Math.max(4, step);
 
-                      for (
-                          int x = 0;
-                          x <= screen.getWidth() - tw;
-                          x += Math.max(2, step)) {
+                  for (int y = 0;
+                       y <= screen.getHeight() - th;
+                       y += scanStep) {
+
+                      for (int x = 0;
+                           x <= screen.getWidth() - tw;
+                           x += scanStep) {
 
                           double sum = 0;
                           int n = 0;
 
-                          for (
-                              int ty = 0;
-                              ty < th;
-                              ty += sampleStep) {
+                          for (int ty = 0;
+                               ty < th;
+                               ty += sampleStep) {
 
-                              for (
-                                  int tx = 0;
-                                  tx < tw;
-                                  tx += sampleStep) {
+                              for (int tx = 0;
+                                   tx < tw;
+                                   tx += sampleStep) {
 
                                   int a =
                                       tpl.getPixel(tx, ty);
@@ -510,25 +521,20 @@ jobs:
                                           x + tx,
                                           y + ty);
 
-                                  int dr =
-                                      Math.abs(
-                                          ((a >> 16) & 255) -
-                                          ((b >> 16) & 255));
+                                  int ar = (a >> 16) & 255;
+                                  int ag = (a >> 8) & 255;
+                                  int ab = a & 255;
 
-                                  int dg =
-                                      Math.abs(
-                                          ((a >> 8) & 255) -
-                                          ((b >> 8) & 255));
+                                  int br = (b >> 16) & 255;
+                                  int bg = (b >> 8) & 255;
+                                  int bb = b & 255;
 
-                                  int db =
-                                      Math.abs(
-                                          (a & 255) -
-                                          (b & 255));
+                                  int diff =
+                                      Math.abs(ar - br) +
+                                      Math.abs(ag - bg) +
+                                      Math.abs(ab - bb);
 
-                                  sum +=
-                                      (dr + dg + db)
-                                      / 3.0;
-
+                                  sum += diff / 3.0;
                                   n++;
                               }
                           }
@@ -572,8 +578,8 @@ jobs:
 
                   MediaProjectionManager m =
                       (MediaProjectionManager)
-                      a.getSystemService(
-                          Context.MEDIA_PROJECTION_SERVICE);
+                          a.getSystemService(
+                              Context.MEDIA_PROJECTION_SERVICE);
 
                   a.startActivityForResult(
                       m.createScreenCaptureIntent(),
@@ -587,766 +593,4 @@ jobs:
 
           import android.app.Activity;
           import android.content.Intent;
-          import android.graphics.Bitmap;
-          import android.net.Uri;
-          import android.os.Build;
-          import android.os.Bundle;
-          import android.provider.Settings;
-          import android.text.InputType;
-          import android.view.View;
-          import android.widget.Button;
-          import android.widget.EditText;
-          import android.widget.LinearLayout;
-          import android.widget.ScrollView;
-          import android.widget.TextView;
-          import android.widget.Toast;
-          import java.io.File;
-          import java.io.FileOutputStream;
-
-          public class MainActivity extends Activity {
-
-              public static float attackX = 600;
-              public static float attackY = 700;
-
-              public static long walkDelay = 1800;
-              public static long scanDelay = 900;
-              public static long attackDelay = 250;
-
-              public static String waypoints =
-                  "300,500;500,500;700,500;700,800;500,800;300,800";
-
-              EditText ax, ay, delay, scan, wp;
-              EditText mx, my, mw, mh;
-              EditText ix, iy, iw, ih;
-              TextView status;
-
-              @Override
-              protected void onCreate(Bundle b) {
-
-                  super.onCreate(b);
-
-                  LinearLayout root =
-                      new LinearLayout(this);
-
-                  root.setOrientation(
-                      LinearLayout.VERTICAL);
-
-                  root.setPadding(
-                      18, 18, 18, 18);
-
-                  TextView title =
-                      new TextView(this);
-
-                  title.setText(
-                      "DUSTIN BOT V2.1\n" +
-                      "ตรวจภาพ Monster / Item");
-
-                  title.setTextSize(22);
-
-                  root.addView(title);
-
-                  root.addView(button(
-                      "1. เปิด ACCESSIBILITY",
-                      v -> startActivity(
-                          new Intent(
-                              Settings.ACTION_ACCESSIBILITY_SETTINGS))));
-
-                  root.addView(button(
-                      "2. อนุญาต OVERLAY",
-                      v -> {
-
-                          if (Build.VERSION.SDK_INT >= 23) {
-
-                              startActivity(
-                                  new Intent(
-                                      Settings
-                                          .ACTION_MANAGE_OVERLAY_PERMISSION,
-                                      Uri.parse(
-                                          "package:" +
-                                          getPackageName())));
-                          }
-                      }));
-
-                  root.addView(button(
-                      "3. SCREEN CAPTURE",
-                      v -> requestCapture()));
-
-                  ax = field("Attack X", "600");
-                  ay = field("Attack Y", "700");
-
-                  delay =
-                      field("เดินทุก ms", "1800");
-
-                  scan =
-                      field("สแกนทุก ms", "900");
-
-                  root.addView(ax);
-                  root.addView(ay);
-                  root.addView(delay);
-                  root.addView(scan);
-
-                  wp =
-                      field(
-                          "จุดเดิน x,y;x,y...",
-                          waypoints);
-
-                  root.addView(wp);
-
-                  TextView mt =
-                      new TextView(this);
-
-                  mt.setText(
-                      "\nMonster template\n" +
-                      "กำหนดกรอบ X Y W H แล้วกดจับภาพ");
-
-                  root.addView(mt);
-
-                  mx = field("Monster X", "0");
-                  my = field("Monster Y", "0");
-                  mw = field("Monster W", "60");
-                  mh = field("Monster H", "60");
-
-                  root.addView(mx);
-                  root.addView(my);
-                  root.addView(mw);
-                  root.addView(mh);
-
-                  root.addView(button(
-                      "จับภาพ Monster",
-                      v -> captureTemplate(
-                          "monster.png",
-                          mx, my, mw, mh)));
-
-                  TextView it =
-                      new TextView(this);
-
-                  it.setText(
-                      "\nItem template\n" +
-                      "กำหนดกรอบ X Y W H แล้วกดจับภาพ");
-
-                  root.addView(it);
-
-                  ix = field("Item X", "0");
-                  iy = field("Item Y", "0");
-                  iw = field("Item W", "50");
-                  ih = field("Item H", "50");
-
-                  root.addView(ix);
-                  root.addView(iy);
-                  root.addView(iw);
-                  root.addView(ih);
-
-                  root.addView(button(
-                      "จับภาพ Item",
-                      v -> captureTemplate(
-                          "item.png",
-                          ix, iy, iw, ih)));
-
-                  root.addView(button(
-                      "บันทึกค่า",
-                      v -> save()));
-
-                  root.addView(button(
-                      "เปิดปุ่ม BOT",
-                      v -> {
-
-                          save();
-
-                          if (!Settings.canDrawOverlays(this)) {
-                              toast(
-                                  "ต้องเปิด Overlay ก่อน");
-                              return;
-                          }
-
-                          startService(
-                              new Intent(
-                                  this,
-                                  BotOverlayService.class));
-                      }));
-
-                  status =
-                      new TextView(this);
-
-                  status.setText(
-                      "\nสถานะ: พร้อม\n" +
-                      "เปิด Screen Capture แล้วจับภาพ " +
-                      "Monster/Item ก่อนเริ่ม BOT");
-
-                  root.addView(status);
-
-                  ScrollView scrollView = new ScrollView(this);
-                  scrollView.setFillViewport(true);
-                  scrollView.addView(root);
-
-                  setContentView(scrollView);
-              }
-
-              Button button(
-                      String text,
-                      View.OnClickListener listener) {
-
-                  Button b =
-                      new Button(this);
-
-                  b.setText(text);
-                  b.setOnClickListener(listener);
-
-                  return b;
-              }
-
-              EditText field(
-                      String hint,
-                      String value) {
-
-                  EditText e =
-                      new EditText(this);
-
-                  e.setHint(hint);
-                  e.setText(value);
-
-                  e.setInputType(
-                      InputType.TYPE_CLASS_NUMBER |
-                      InputType.TYPE_NUMBER_FLAG_DECIMAL);
-
-                  return e;
-              }
-
-              float number(EditText e) {
-                  return Float.parseFloat(
-                      e.getText().toString().trim());
-              }
-
-              long integer(EditText e) {
-                  return Long.parseLong(
-                      e.getText().toString().trim());
-              }
-
-              void save() {
-
-                  try {
-
-                      attackX = number(ax);
-                      attackY = number(ay);
-
-                      walkDelay =
-                          integer(delay);
-
-                      scanDelay =
-                          integer(scan);
-
-                      waypoints =
-                          wp.getText().toString().trim();
-
-                      toast("บันทึกแล้ว");
-
-                  } catch (Exception e) {
-
-                      toast(
-                          "กรุณาตรวจสอบค่า");
-                  }
-              }
-
-              void captureTemplate(
-                      String name,
-                      EditText ex,
-                      EditText ey,
-                      EditText ew,
-                      EditText eh) {
-
-                  try {
-
-                      Bitmap screen =
-                          CaptureService
-                              .getLatestCopy();
-
-                      if (screen == null) {
-
-                          toast(
-                              "ต้องเปิด SCREEN CAPTURE ก่อน");
-
-                          return;
-                      }
-
-                      int x =
-                          (int) number(ex);
-
-                      int y =
-                          (int) number(ey);
-
-                      int w =
-                          (int) number(ew);
-
-                      int h =
-                          (int) number(eh);
-
-                      if (x < 0 ||
-                          y < 0 ||
-                          w < 5 ||
-                          h < 5 ||
-                          x + w > screen.getWidth() ||
-                          y + h > screen.getHeight()) {
-
-                          screen.recycle();
-
-                          toast(
-                              "กรอบอยู่นอกหน้าจอ");
-
-                          return;
-                      }
-
-                      Bitmap crop =
-                          Bitmap.createBitmap(
-                              screen,
-                              x,
-                              y,
-                              w,
-                              h);
-
-                      FileOutputStream out =
-                          new FileOutputStream(
-                              new File(
-                                  getFilesDir(),
-                                  name));
-
-                      crop.compress(
-                          Bitmap.CompressFormat.PNG,
-                          100,
-                          out);
-
-                      out.close();
-
-                      crop.recycle();
-                      screen.recycle();
-
-                      toast(
-                          "บันทึก " + name + " แล้ว");
-
-                      if (status != null)
-                          status.setText(
-                              "\n" +
-                              name +
-                              " พร้อมใช้งาน");
-
-                  } catch (Exception e) {
-
-                      toast(
-                          "จับภาพไม่สำเร็จ");
-                  }
-              }
-
-              void requestCapture() {
-                  MediaProjectionManagerHelper
-                      .request(this);
-              }
-
-              void toast(String text) {
-
-                  Toast.makeText(
-                      this,
-                      text,
-                      Toast.LENGTH_SHORT).show();
-              }
-
-              @Override
-              protected void onActivityResult(
-                      int requestCode,
-                      int resultCode,
-                      Intent data) {
-
-                  super.onActivityResult(
-                      requestCode,
-                      resultCode,
-                      data);
-
-                  if (requestCode == 500 &&
-                      resultCode == RESULT_OK &&
-                      data != null) {
-
-                      Intent i =
-                          new Intent(
-                              this,
-                              CaptureService.class);
-
-                      i.putExtra(
-                          "resultCode",
-                          resultCode);
-
-                      i.putExtra(
-                          "data",
-                          data);
-
-                      if (Build.VERSION.SDK_INT >= 26)
-                          startForegroundService(i);
-                      else
-                          startService(i);
-
-                      toast(
-                          "กำลังเริ่ม Screen Capture");
-                  }
-              }
-          }
-          EOF
-
-          cat > app/src/main/java/com/dustinbot/v2/BotOverlayService.java <<'EOF'
-          package com.dustinbot.v2;
-
-          import android.app.Service;
-          import android.content.Intent;
-          import android.graphics.Bitmap;
-          import android.graphics.BitmapFactory;
-          import android.graphics.Color;
-          import android.graphics.PixelFormat;
-          import android.graphics.Rect;
-          import android.os.Handler;
-          import android.os.IBinder;
-          import android.os.Looper;
-          import android.provider.Settings;
-          import android.view.Gravity;
-          import android.view.View;
-          import android.view.WindowManager;
-          import android.widget.Button;
-          import android.widget.LinearLayout;
-          import android.widget.Toast;
-          import java.io.File;
-
-          public class BotOverlayService extends Service {
-
-              private WindowManager wm;
-              private LinearLayout box;
-              private final Handler handler =
-                  new Handler(Looper.getMainLooper());
-
-              private volatile boolean running = false;
-
-              private int waypointIndex = 0;
-
-              private Bitmap monster;
-              private Bitmap item;
-
-              private final Runnable loop =
-                  new Runnable() {
-
-                      @Override
-                      public void run() {
-
-                          if (!running)
-                              return;
-
-                          try {
-
-                              Bitmap screen =
-                                  CaptureService
-                                      .getLatestCopy();
-
-                              BotAccessibilityService access =
-                                  BotAccessibilityService
-                                      .instance;
-
-                              if (screen != null &&
-                                  access != null) {
-
-                                  if (monster == null)
-                                      monster =
-                                          load(
-                                              "monster.png");
-
-                                  if (item == null)
-                                      item =
-                                          load(
-                                              "item.png");
-
-                                  boolean acted = false;
-
-                                  if (monster != null) {
-
-                                      Rect target =
-                                          TemplateMatcher.find(
-                                              screen,
-                                              monster,
-                                              12,
-                                              55);
-
-                                      if (target != null) {
-
-                                          access.tap(
-                                              target.centerX(),
-                                              target.centerY());
-
-                                          handler.postDelayed(
-                                              () -> {
-
-                                                  if (running &&
-                                                      BotAccessibilityService
-                                                          .instance != null) {
-
-                                                      BotAccessibilityService
-                                                          .instance.tap(
-                                                              MainActivity.attackX,
-                                                              MainActivity.attackY);
-                                                  }
-
-                                              },
-                                              MainActivity.attackDelay);
-
-                                          acted = true;
-                                      }
-                                  }
-
-                                  if (!acted &&
-                                      item != null) {
-
-                                      Rect target =
-                                          TemplateMatcher.find(
-                                              screen,
-                                              item,
-                                              12,
-                                              55);
-
-                                      if (target != null) {
-
-                                          access.tap(
-                                              target.centerX(),
-                                              target.centerY());
-
-                                          acted = true;
-                                      }
-                                  }
-
-                                  if (!acted)
-                                      walk(access);
-
-                                  screen.recycle();
-                              }
-
-                          } catch (Exception ignored) {
-                          }
-
-                          handler.postDelayed(
-                              this,
-                              Math.max(
-                                  300,
-                                  MainActivity.scanDelay));
-                      }
-                  };
-
-              private Bitmap load(String name) {
-
-                  try {
-
-                      return BitmapFactory.decodeFile(
-                          new File(
-                              getFilesDir(),
-                              name)
-                              .getAbsolutePath());
-
-                  } catch (Exception e) {
-
-                      return null;
-                  }
-              }
-
-              private void walk(
-                      BotAccessibilityService access) {
-
-                  if (MainActivity.waypoints == null)
-                      return;
-
-                  String[] points =
-                      MainActivity.waypoints
-                          .split(";");
-
-                  if (points.length == 0)
-                      return;
-
-                  try {
-
-                      String[] p =
-                          points[
-                              waypointIndex %
-                              points.length]
-                          .trim()
-                          .split(",");
-
-                      if (p.length == 2) {
-
-                          access.tap(
-                              Float.parseFloat(p[0]),
-                              Float.parseFloat(p[1]));
-
-                          waypointIndex++;
-                      }
-
-                  } catch (Exception ignored) {
-                  }
-              }
-
-              @Override
-              public void onCreate() {
-
-                  super.onCreate();
-
-                  if (!Settings.canDrawOverlays(this)) {
-                      stopSelf();
-                      return;
-                  }
-
-                  wm =
-                      (WindowManager)
-                      getSystemService(
-                          WINDOW_SERVICE);
-
-                  box =
-                      new LinearLayout(this);
-
-                  box.setOrientation(
-                      LinearLayout.HORIZONTAL);
-
-                  box.setPadding(
-                      8, 8, 8, 8);
-
-                  box.setBackgroundColor(
-                      Color.argb(
-                          230,
-                          20,
-                          20,
-                          20));
-
-                  Button bot =
-                      new Button(this);
-
-                  bot.setText("BOT");
-
-                  bot.setOnClickListener(
-                      v -> startBot());
-
-                  box.addView(bot);
-
-                  Button stop =
-                      new Button(this);
-
-                  stop.setText("STOP");
-
-                  stop.setOnClickListener(
-                      v -> stopBot());
-
-                  box.addView(stop);
-
-                  int type =
-                      android.os.Build.VERSION.SDK_INT >= 26
-                      ? WindowManager.LayoutParams
-                          .TYPE_APPLICATION_OVERLAY
-                      : WindowManager.LayoutParams
-                          .TYPE_PHONE;
-
-                  WindowManager.LayoutParams lp =
-                      new WindowManager.LayoutParams(
-                          WindowManager.LayoutParams
-                              .WRAP_CONTENT,
-                          WindowManager.LayoutParams
-                              .WRAP_CONTENT,
-                          type,
-                          WindowManager.LayoutParams
-                              .FLAG_NOT_FOCUSABLE,
-                          PixelFormat.TRANSLUCENT);
-
-                  lp.gravity =
-                      Gravity.TOP |
-                      Gravity.LEFT;
-
-                  lp.x = 15;
-                  lp.y = 150;
-
-                  wm.addView(box, lp);
-              }
-
-              private void startBot() {
-
-                  if (CaptureService.latest == null) {
-
-                      Toast.makeText(
-                          this,
-                          "ต้องเปิด Screen Capture ก่อน",
-                          Toast.LENGTH_LONG).show();
-
-                      return;
-                  }
-
-                  if (BotAccessibilityService.instance == null) {
-
-                      Toast.makeText(
-                          this,
-                          "ต้องเปิด Accessibility ก่อน",
-                          Toast.LENGTH_LONG).show();
-
-                      return;
-                  }
-
-                  running = true;
-                  waypointIndex = 0;
-
-                  handler.removeCallbacks(loop);
-                  handler.post(loop);
-              }
-
-              private void stopBot() {
-
-                  running = false;
-
-                  handler.removeCallbacksAndMessages(
-                      null);
-              }
-
-              @Override
-              public int onStartCommand(
-                      Intent intent,
-                      int flags,
-                      int startId) {
-
-                  return START_STICKY;
-              }
-
-              @Override
-              public void onDestroy() {
-
-                  stopBot();
-
-                  if (monster != null)
-                      monster.recycle();
-
-                  if (item != null)
-                      item.recycle();
-
-                  if (box != null)
-                      wm.removeView(box);
-
-                  super.onDestroy();
-              }
-
-              @Override
-              public IBinder onBind(Intent intent) {
-                  return null;
-              }
-          }
-          EOF
-
-      - name: Setup JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.7'
-
-      - name: Build APK
-        run: |
-          gradle :app:assembleDebug --stacktrace --no-daemon
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: DustinBotV2.1-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+          import android
