@@ -597,6 +597,7 @@ jobs:
           import android.widget.Button;
           import android.widget.EditText;
           import android.widget.LinearLayout;
+          import android.widget.ScrollView;
           import android.widget.TextView;
           import android.widget.Toast;
           import java.io.File;
@@ -773,7 +774,11 @@ jobs:
 
                   root.addView(status);
 
-                  setContentView(root);
+                  ScrollView scrollView = new ScrollView(this);
+                  scrollView.setFillViewport(true);
+                  scrollView.addView(root);
+
+                  setContentView(scrollView);
               }
 
               Button button(
