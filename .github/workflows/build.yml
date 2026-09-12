@@ -1,0 +1,699 @@
+name: Build DustinBot V2
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf app build.gradle settings.gradle gradle.properties
+
+          mkdir -p app/src/main/java/com/dustinbot/v2
+          mkdir -p app/src/main/res/xml
+          mkdir -p app/src/main/res/values
+
+          cat > settings.gradle <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+
+          rootProject.name = "DustinBotV2"
+          include(":app")
+          EOF
+
+          cat > build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application' version '8.6.1' apply false
+          }
+          EOF
+
+          cat > gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+          android.useAndroidX=true
+          EOF
+
+          cat > app/build.gradle <<'EOF'
+          plugins {
+              id 'com.android.application'
+          }
+
+          android {
+              namespace 'com.dustinbot.v2'
+              compileSdk 35
+
+              defaultConfig {
+                  applicationId 'com.dustinbot.v2'
+                  minSdk 26
+                  targetSdk 35
+                  versionCode 1
+                  versionName '2.0'
+              }
+          }
+          EOF
+
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+          <resources>
+              <string name="app_name">Dustin Bot V2</string>
+              <string name="accessibility_description">Dustin Bot V2 control service</string>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+          <resources>
+              <style name="AppTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+                  <item name="android:fontFamily">sans</item>
+                  <item name="android:colorAccent">#1976D2</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:windowLightStatusBar">true</item>
+              </style>
+          </resources>
+          EOF
+
+          cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <accessibility-service
+              xmlns:android="http://schemas.android.com/apk/res/android"
+              android:accessibilityEventTypes="typeAllMask"
+              android:accessibilityFeedbackType="feedbackGeneric"
+              android:notificationTimeout="100"
+              android:canRetrieveWindowContent="false"
+              android:canPerformGestures="true"
+              android:description="@string/accessibility_description" />
+          EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+
+              <application
+                  android:theme="@style/AppTheme"
+                  android:label="@string/app_name"
+                  android:allowBackup="false"
+                  android:supportsRtl="true">
+
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+
+                  <service
+                      android:name=".BotAccessibilityService"
+                      android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+                      android:exported="false">
+                      <intent-filter>
+                          <action android:name="android.accessibilityservice.AccessibilityService"/>
+                      </intent-filter>
+                      <meta-data
+                          android:name="android.accessibilityservice"
+                          android:resource="@xml/accessibility_service_config"/>
+                  </service>
+
+                  <service
+                      android:name=".BotOverlayService"
+                      android:exported="false"/>
+
+                  <service
+                      android:name=".CaptureService"
+                      android:exported="false"
+                      android:foregroundServiceType="mediaProjection"/>
+              </application>
+          </manifest>
+          EOF
+
+          cat > app/src/main/java/com/dustinbot/v2/BotAccessibilityService.java <<'EOF'
+          package com.dustinbot.v2;
+
+          import android.accessibilityservice.AccessibilityService;
+          import android.accessibilityservice.GestureDescription;
+          import android.graphics.Path;
+          import android.view.accessibility.AccessibilityEvent;
+
+          public class BotAccessibilityService extends AccessibilityService {
+
+              public static volatile BotAccessibilityService instance;
+
+              @Override
+              public void onServiceConnected() {
+                  super.onServiceConnected();
+                  instance = this;
+              }
+
+              @Override
+              public void onAccessibilityEvent(AccessibilityEvent event) {}
+
+              @Override
+              public void onInterrupt() {}
+
+              @Override
+              public void onDestroy() {
+                  if (instance == this) instance = null;
+                  super.onDestroy();
+              }
+
+              public boolean tap(float x, float y) {
+                  if (instance == null) return false;
+
+                  Path path = new Path();
+                  path.moveTo(x, y);
+
+                  GestureDescription gesture =
+                          new GestureDescription.Builder()
+                                  .addStroke(
+                                          new GestureDescription.StrokeDescription(
+                                                  path, 0, 80))
+                                  .build();
+
+                  return dispatchGesture(gesture, null, null);
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/dustinbot/v2/CaptureService.java <<'EOF'
+          package com.dustinbot.v2;
+
+          import android.app.Notification;
+          import android.app.NotificationChannel;
+          import android.app.NotificationManager;
+          import android.app.Service;
+          import android.content.Intent;
+          import android.content.Context;
+          import android.media.projection.MediaProjection;
+          import android.media.projection.MediaProjectionManager;
+          import android.os.Build;
+          import android.os.IBinder;
+
+          public class CaptureService extends Service {
+
+              public static volatile boolean running = false;
+              private MediaProjection projection;
+
+              private static final String CHANNEL = "dustin_capture";
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  createChannel();
+
+                  Notification n = new Notification.Builder(this, CHANNEL)
+                          .setContentTitle("Dustin Bot V2")
+                          .setContentText("Screen capture active")
+                          .setSmallIcon(android.R.drawable.ic_menu_view)
+                          .build();
+
+                  startForeground(20, n);
+
+                  if (intent != null) {
+                      int result = intent.getIntExtra("resultCode", 0);
+                      Intent data = intent.getParcelableExtra("data");
+
+                      if (data != null) {
+                          MediaProjectionManager m =
+                                  (MediaProjectionManager)getSystemService(
+                                          MEDIA_PROJECTION_SERVICE);
+                          projection = m.getMediaProjection(result, data);
+                          running = projection != null;
+                      }
+                  }
+
+                  return START_STICKY;
+              }
+
+              private void createChannel() {
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      NotificationChannel c = new NotificationChannel(
+                              CHANNEL,
+                              "Dustin Bot Capture",
+                              NotificationManager.IMPORTANCE_LOW);
+
+                      NotificationManager nm =
+                              (NotificationManager)getSystemService(
+                                      Context.NOTIFICATION_SERVICE);
+
+                      nm.createNotificationChannel(c);
+                  }
+              }
+
+              @Override
+              public void onDestroy() {
+                  running = false;
+
+                  if (projection != null) {
+                      projection.stop();
+                      projection = null;
+                  }
+
+                  super.onDestroy();
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/dustinbot/v2/BotOverlayService.java <<'EOF'
+          package com.dustinbot.v2;
+
+          import android.app.Service;
+          import android.content.Intent;
+          import android.graphics.Color;
+          import android.graphics.PixelFormat;
+          import android.os.Handler;
+          import android.os.IBinder;
+          import android.provider.Settings;
+          import android.view.Gravity;
+          import android.view.View;
+          import android.view.WindowManager;
+          import android.widget.Button;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+
+          public class BotOverlayService extends Service {
+
+              private WindowManager wm;
+              private LinearLayout box;
+              private Handler handler = new Handler();
+              private volatile boolean botRunning = false;
+              private int waypointIndex = 0;
+
+              private final Runnable loop = new Runnable() {
+                  @Override
+                  public void run() {
+                      if (!botRunning) return;
+
+                      BotAccessibilityService s =
+                              BotAccessibilityService.instance;
+
+                      if (s != null) {
+                          String[] points = MainActivity.getWaypoints();
+
+                          if (points.length > 0) {
+                              try {
+                                  String[] p = points[waypointIndex]
+                                          .trim().split(",");
+
+                                  if (p.length == 2) {
+                                      s.tap(
+                                              Float.parseFloat(p[0]),
+                                              Float.parseFloat(p[1]));
+                                  }
+
+                                  waypointIndex++;
+                                  if (waypointIndex >= points.length)
+                                      waypointIndex = 0;
+                              } catch (Exception ignored) {}
+                          }
+
+                          s.tap(
+                                  MainActivity.attackX,
+                                  MainActivity.attackY);
+
+                          if (MainActivity.itemX > 0 &&
+                              MainActivity.itemY > 0) {
+                              handler.postDelayed(() -> {
+                                  if (botRunning &&
+                                      BotAccessibilityService.instance != null) {
+                                      BotAccessibilityService.instance.tap(
+                                              MainActivity.itemX,
+                                              MainActivity.itemY);
+                                  }
+                              }, MainActivity.attackDelay);
+                          }
+                      }
+
+                      handler.postDelayed(this, MainActivity.walkDelay);
+                  }
+              };
+
+              @Override
+              public int onStartCommand(Intent intent, int flags, int startId) {
+                  if (intent != null &&
+                      "STOP".equals(intent.getAction())) {
+                      stopBot();
+                  }
+                  return START_STICKY;
+              }
+
+              private void startBot() {
+                  if (botRunning) return;
+                  botRunning = true;
+                  waypointIndex = 0;
+                  handler.post(loop);
+              }
+
+              private void stopBot() {
+                  botRunning = false;
+                  handler.removeCallbacksAndMessages(null);
+              }
+
+              @Override
+              public void onCreate() {
+                  super.onCreate();
+
+                  if (!Settings.canDrawOverlays(this)) {
+                      stopSelf();
+                      return;
+                  }
+
+                  wm = (WindowManager)getSystemService(WINDOW_SERVICE);
+
+                  box = new LinearLayout(this);
+                  box.setOrientation(LinearLayout.VERTICAL);
+                  box.setPadding(12, 12, 12, 12);
+                  box.setBackgroundColor(Color.argb(220, 20, 20, 20));
+
+                  TextView title = new TextView(this);
+                  title.setText("DUSTIN BOT V2");
+                  title.setTextColor(Color.WHITE);
+                  title.setTextSize(16);
+                  box.addView(title);
+
+                  Button bot = new Button(this);
+                  bot.setText("BOT");
+                  bot.setOnClickListener(v -> startBot());
+                  box.addView(bot);
+
+                  Button stop = new Button(this);
+                  stop.setText("STOP");
+                  stop.setOnClickListener(v -> stopBot());
+                  box.addView(stop);
+
+                  WindowManager.LayoutParams lp =
+                          new WindowManager.LayoutParams(
+                                  WindowManager.LayoutParams.WRAP_CONTENT,
+                                  WindowManager.LayoutParams.WRAP_CONTENT,
+                                  BuildVersion.overlayType(),
+                                  WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                                  PixelFormat.TRANSLUCENT);
+
+                  lp.gravity = Gravity.TOP | Gravity.LEFT;
+                  lp.x = 20;
+                  lp.y = 150;
+
+                  wm.addView(box, lp);
+              }
+
+              @Override
+              public void onDestroy() {
+                  stopBot();
+                  if (box != null) wm.removeView(box);
+                  super.onDestroy();
+              }
+
+              @Override
+              public IBinder onBind(Intent intent) {
+                  return null;
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/dustinbot/v2/BuildVersion.java <<'EOF'
+          package com.dustinbot.v2;
+
+          import android.os.Build;
+          import android.view.WindowManager;
+
+          public class BuildVersion {
+              public static int overlayType() {
+                  if (Build.VERSION.SDK_INT >= 26)
+                      return WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
+                  return WindowManager.LayoutParams.TYPE_PHONE;
+              }
+          }
+          EOF
+
+          cat > app/src/main/java/com/dustinbot/v2/MainActivity.java <<'EOF'
+          package com.dustinbot.v2;
+
+          import android.app.Activity;
+          import android.content.Context;
+          import android.content.Intent;
+          import android.media.projection.MediaProjectionManager;
+          import android.net.Uri;
+          import android.os.Bundle;
+          import android.provider.Settings;
+          import android.view.Gravity;
+          import android.widget.Button;
+          import android.widget.EditText;
+          import android.widget.LinearLayout;
+          import android.widget.TextView;
+          import android.widget.Toast;
+
+          public class MainActivity extends Activity {
+
+              public static float attackX = 600;
+              public static float attackY = 700;
+              public static float itemX = 0;
+              public static float itemY = 0;
+
+              public static long walkDelay = 1500;
+              public static long attackDelay = 300;
+
+              private static String waypoints =
+                      "300,500;500,500;700,500;700,800;500,800;300,800";
+
+              private EditText attackXBox;
+              private EditText attackYBox;
+              private EditText itemXBox;
+              private EditText itemYBox;
+              private EditText waypointBox;
+              private EditText delayBox;
+
+              @Override
+              protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+
+                  LinearLayout root = new LinearLayout(this);
+                  root.setOrientation(LinearLayout.VERTICAL);
+                  root.setPadding(25,25,25,25);
+
+                  TextView title = new TextView(this);
+                  title.setText("Dustin Bot V2");
+                  title.setTextSize(25);
+                  title.setGravity(Gravity.CENTER);
+                  root.addView(title);
+
+                  Button access = new Button(this);
+                  access.setText("1. เปิด Accessibility");
+                  access.setOnClickListener(v ->
+                          startActivity(new Intent(
+                                  Settings.ACTION_ACCESSIBILITY_SETTINGS)));
+                  root.addView(access);
+
+                  Button overlay = new Button(this);
+                  overlay.setText("2. อนุญาต Overlay");
+                  overlay.setOnClickListener(v -> {
+                      if (android.os.Build.VERSION.SDK_INT >= 23) {
+                          Intent i = new Intent(
+                                  Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                  Uri.parse("package:" + getPackageName()));
+                          startActivity(i);
+                      }
+                  });
+                  root.addView(overlay);
+
+                  Button capture = new Button(this);
+                  capture.setText("3. อนุญาต Screen Capture");
+                  capture.setOnClickListener(v -> requestCapture());
+                  root.addView(capture);
+
+                  attackXBox = field("Attack X", "600");
+                  attackYBox = field("Attack Y", "700");
+                  itemXBox = field("Item X (0=ปิด)", "0");
+                  itemYBox = field("Item Y (0=ปิด)", "0");
+                  delayBox = field("เดินทุกกี่ ms", "1500");
+
+                  root.addView(attackXBox);
+                  root.addView(attackYBox);
+                  root.addView(itemXBox);
+                  root.addView(itemYBox);
+                  root.addView(delayBox);
+
+                  TextView wp = new TextView(this);
+                  wp.setText("จุดเดิน x,y;x,y;x,y...");
+                  root.addView(wp);
+
+                  waypointBox = new EditText(this);
+                  waypointBox.setText(waypoints);
+                  root.addView(waypointBox);
+
+                  Button save = new Button(this);
+                  save.setText("บันทึกค่า");
+                  save.setOnClickListener(v -> save());
+                  root.addView(save);
+
+                  Button start = new Button(this);
+                  start.setText("เปิดปุ่ม BOT");
+                  start.setOnClickListener(v -> {
+                      save();
+
+                      if (!Settings.canDrawOverlays(this)) {
+                          Toast.makeText(this,
+                                  "ต้องเปิด Overlay ก่อน",
+                                  Toast.LENGTH_LONG).show();
+                          return;
+                      }
+
+                      startService(new Intent(
+                              this,
+                              BotOverlayService.class));
+                  });
+                  root.addView(start);
+
+                  TextView info = new TextView(this);
+                  info.setText(
+                          "\nวิธีใช้:\n" +
+                          "เปิด Accessibility → Overlay → Screen Capture\n" +
+                          "ตั้งจุดเดินและตำแหน่งโจมตี → บันทึก → เปิด BOT\n\n" +
+                          "หมายเหตุ: โหมดนี้ใช้การควบคุมหน้าจอ " +
+                          "และพิกัดที่ตั้งไว้ ไม่อ่านข้อมูลภายในเกม");
+                  root.addView(info);
+
+                  setContentView(root);
+              }
+
+              private EditText field(String hint, String value) {
+                  EditText e = new EditText(this);
+                  e.setHint(hint);
+                  e.setText(value);
+                  e.setInputType(
+                          android.text.InputType.TYPE_CLASS_NUMBER |
+                          android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
+                  return e;
+              }
+
+              private void save() {
+                  try {
+                      attackX = Float.parseFloat(
+                              attackXBox.getText().toString());
+                      attackY = Float.parseFloat(
+                              attackYBox.getText().toString());
+
+                      itemX = Float.parseFloat(
+                              itemXBox.getText().toString());
+                      itemY = Float.parseFloat(
+                              itemYBox.getText().toString());
+
+                      walkDelay = Long.parseLong(
+                              delayBox.getText().toString());
+
+                      waypoints =
+                              waypointBox.getText().toString();
+
+                      Toast.makeText(
+                              this,
+                              "บันทึกแล้ว",
+                              Toast.LENGTH_SHORT).show();
+                  } catch (Exception e) {
+                      Toast.makeText(
+                              this,
+                              "กรุณาตรวจสอบค่าที่กรอก",
+                              Toast.LENGTH_SHORT).show();
+                  }
+              }
+
+              public static String[] getWaypoints() {
+                  if (waypoints == null ||
+                      waypoints.trim().isEmpty())
+                      return new String[0];
+
+                  return waypoints.split(";");
+              }
+
+              private void requestCapture() {
+                  MediaProjectionManager m =
+                          (MediaProjectionManager)getSystemService(
+                                  MEDIA_PROJECTION_SERVICE);
+
+                  startActivityForResult(
+                          m.createScreenCaptureIntent(),
+                          500);
+              }
+
+              @Override
+              protected void onActivityResult(
+                      int requestCode,
+                      int resultCode,
+                      Intent data) {
+                  super.onActivityResult(
+                          requestCode, resultCode, data);
+
+                  if (requestCode == 500 &&
+                      resultCode == RESULT_OK &&
+                      data != null) {
+
+                      Intent i = new Intent(
+                              this,
+                              CaptureService.class);
+
+                      i.putExtra("resultCode", resultCode);
+                      i.putExtra("data", data);
+
+                      startForegroundService(i);
+
+                      Toast.makeText(
+                              this,
+                              "Screen Capture เปิดแล้ว",
+                              Toast.LENGTH_SHORT).show();
+                  }
+              }
+          }
+          EOF
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Gradle 8.7
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: |
+          gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DustinBotV2-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
