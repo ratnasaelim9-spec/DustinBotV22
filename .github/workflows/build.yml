@@ -1,4 +1,4 @@
-name: Build DustinBot V4.3
+name: Build DustinBot V5.1
 
 on:
   workflow_dispatch:
@@ -14,25 +14,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Java 17
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - name: Gradle 8.7
+      - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
 
-      - name: Create Android project
+      - name: Create project
         shell: bash
         run: |
           set -e
 
-          rm -rf app gradle build.gradle settings.gradle gradle.properties
+          rm -rf app gradle
+          rm -f build.gradle settings.gradle gradle.properties
 
-          mkdir -p app/src/main/java/com/dustinbot/v43
+          mkdir -p app/src/main/java/com/dustinbot/v51
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
@@ -53,7 +54,7 @@ jobs:
               }
           }
 
-          rootProject.name = "DustinBotV43"
+          rootProject.name = "DustinBotV51"
           include(":app")
           EOF
 
@@ -74,15 +75,15 @@ jobs:
           }
 
           android {
-              namespace "com.dustinbot.v43"
+              namespace "com.dustinbot.v51"
               compileSdk 35
 
               defaultConfig {
-                  applicationId "com.dustinbot.v43"
+                  applicationId "com.dustinbot.v51"
                   minSdk 26
                   targetSdk 35
-                  versionCode 43
-                  versionName "4.3"
+                  versionCode 51
+                  versionName "5.1"
               }
           }
           EOF
@@ -94,6 +95,8 @@ jobs:
                   parent="android:style/Theme.Material.Light.NoActionBar">
                   <item name="android:fontFamily">sans</item>
                   <item name="android:colorAccent">#1976D2</item>
+                  <item name="android:navigationBarColor">#000000</item>
+                  <item name="android:statusBarColor">#111111</item>
               </style>
           </resources>
           EOF
@@ -102,7 +105,7 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service
               xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+              android:accessibilityEventTypes="typeWindowStateChanged"
               android:accessibilityFeedbackType="feedbackGeneric"
               android:notificationTimeout="100"
               android:canRetrieveWindowContent="false"
@@ -111,9 +114,7 @@ jobs:
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
           <?xml version="1.0" encoding="utf-8"?>
-
-          <manifest
-              xmlns:android="http://schemas.android.com/apk/res/android">
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
               <uses-permission
                   android:name="android.permission.SYSTEM_ALERT_WINDOW" />
@@ -124,30 +125,24 @@ jobs:
               <uses-permission
                   android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
-              <uses-permission
-                  android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-
               <application
-                  android:theme="@style/AppTheme"
-                  android:label="DustinBot V4.3"
-                  android:allowBackup="false">
+                  android:allowBackup="false"
+                  android:label="DustinBot V5.1"
+                  android:theme="@style/AppTheme">
 
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
 
                       <intent-filter>
-                          <action
-                              android:name="android.intent.action.MAIN" />
-
-                          <category
-                              android:name="android.intent.category.LAUNCHER" />
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
 
                   </activity>
 
                   <service
-                      android:name=".MainActivity$BotAccessibilityService"
+                      android:name=".MainActivity$AccessService"
                       android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
                       android:exported="true">
 
@@ -168,100 +163,88 @@ jobs:
                       android:foregroundServiceType="mediaProjection" />
 
                   <service
-                      android:name=".MainActivity$BotService"
-                      android:exported="false"
-                      android:foregroundServiceType="dataSync" />
+                      android:name=".MainActivity$VisionService"
+                      android:exported="false" />
 
               </application>
 
           </manifest>
           EOF
 
-          cat > app/src/main/java/com/dustinbot/v43/MainActivity.java <<'EOF'
-          package com.dustinbot.v43;
+          cat > app/src/main/java/com/dustinbot/v51/MainActivity.java <<'EOF'
+          package com.dustinbot.v51;
 
           import android.accessibilityservice.AccessibilityService;
-          import android.accessibilityservice.GestureDescription;
-
+          import android.app.Activity;
           import android.app.Notification;
           import android.app.NotificationChannel;
           import android.app.NotificationManager;
           import android.app.Service;
-
           import android.content.Intent;
-
           import android.graphics.Bitmap;
           import android.graphics.Color;
+          import android.graphics.Paint;
           import android.graphics.Path;
           import android.graphics.PixelFormat;
-          import android.graphics.PointF;
-
-          import android.hardware.display.DisplayManager;
-
           import android.media.Image;
           import android.media.ImageReader;
-
           import android.media.projection.MediaProjection;
           import android.media.projection.MediaProjectionManager;
-
-          import android.net.Uri;
-
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.HandlerThread;
           import android.os.IBinder;
-          import android.os.Looper;
-
           import android.provider.Settings;
-
-          import android.util.DisplayMetrics;
-
+          import android.net.Uri;
           import android.view.Gravity;
           import android.view.MotionEvent;
           import android.view.View;
           import android.view.WindowManager;
-
-          import android.view.accessibility.AccessibilityEvent;
-
           import android.widget.Button;
-          import android.widget.FrameLayout;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
 
           import java.nio.ByteBuffer;
-          import java.util.ArrayList;
 
-          public class MainActivity extends android.app.Activity {
+          public class MainActivity extends Activity {
 
-              static final int CAPTURE = 4301;
+              static final int CAPTURE = 5101;
 
               int dp(int n) {
                   return (int)(
                       n *
-                      getResources()
-                          .getDisplayMetrics()
-                          .density
+                      getResources().getDisplayMetrics().density
                       + 0.5f
                   );
               }
 
+              TextView label(String s, int size) {
+                  TextView t = new TextView(this);
+                  t.setText(s);
+                  t.setTextSize(size);
+                  t.setPadding(
+                      dp(8),
+                      dp(8),
+                      dp(8),
+                      dp(8)
+                  );
+                  return t;
+              }
+
               Button button(
-                      String text,
+                      String s,
                       View.OnClickListener listener) {
 
-                  Button b =
-                      new Button(this);
-
-                  b.setText(text);
+                  Button b = new Button(this);
+                  b.setText(s);
                   b.setOnClickListener(listener);
-
                   return b;
               }
 
               @Override
-              public void onCreate(Bundle state) {
+              protected void onCreate(Bundle state) {
 
                   super.onCreate(state);
 
@@ -279,36 +262,34 @@ jobs:
                       dp(20)
                   );
 
-                  TextView title =
-                      new TextView(this);
-
-                  title.setText(
-                      "DUSTIN BOT V4.3"
+                  box.addView(
+                      label(
+                          "DUSTIN BOT V5.1",
+                          26
+                      )
                   );
 
-                  title.setTextSize(25);
-
-                  box.addView(title);
-
-                  TextView info =
-                      new TextView(this);
-
-                  info.setText(
-                      "เดิน → หา Monster → Lock → โจมตี → Loot → วน"
+                  box.addView(
+                      label(
+                          "VISION TEST",
+                          18
+                      )
                   );
 
-                  info.setTextSize(14);
-
-                  box.addView(info);
+                  box.addView(
+                      label(
+                          "ทดสอบการมองเห็นก่อนเพิ่มระบบเดิน/ตี/เก็บ",
+                          14
+                      )
+                  );
 
                   box.addView(
                       button(
-                          "1. ACCESSIBILITY",
+                          "1. เปิด Accessibility",
                           v ->
                               startActivity(
                                   new Intent(
-                                      Settings
-                                          .ACTION_ACCESSIBILITY_SETTINGS
+                                      Settings.ACTION_ACCESSIBILITY_SETTINGS
                                   )
                               )
                       )
@@ -316,13 +297,12 @@ jobs:
 
                   box.addView(
                       button(
-                          "2. OVERLAY",
+                          "2. เปิด Overlay",
                           v -> {
 
                               Intent i =
                                   new Intent(
-                                      Settings
-                                          .ACTION_MANAGE_OVERLAY_PERMISSION,
+                                      Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                                       Uri.parse(
                                           "package:" +
                                           getPackageName()
@@ -343,133 +323,87 @@ jobs:
 
                   box.addView(
                       button(
-                          "4. เปิด BOT PANEL",
-                          v -> startBotService()
+                          "4. เปิด VISION",
+                          v -> startVision()
                       )
                   );
 
                   box.addView(
                       button(
-                          "5. บันทึกเส้นทาง",
+                          "5. เลือก MONSTER",
                           v -> {
 
-                              startBotService();
+                              startVision();
 
-                              new Handler()
-                                  .postDelayed(
-                                      () -> {
+                              new Handler().postDelayed(
+                                  () -> {
 
-                                          if (
-                                              BotService.instance
-                                              != null
-                                          ) {
+                                      if (
+                                          VisionService.instance != null
+                                      ) {
 
-                                              BotService.instance
-                                                  .routeMode();
-                                          }
+                                          VisionService.instance
+                                              .selectTarget();
 
-                                      },
-                                      500
-                                  );
+                                      }
+
+                                  },
+                                  600
+                              );
                           }
                       )
                   );
 
                   box.addView(
                       button(
-                          "6. เลือก MONSTER",
+                          "6. VISION START",
                           v -> {
 
-                              startBotService();
+                              startVision();
 
-                              new Handler()
-                                  .postDelayed(
-                                      () -> {
+                              new Handler().postDelayed(
+                                  () -> {
 
-                                          if (
-                                              BotService.instance
-                                              != null
-                                          ) {
+                                      if (
+                                          VisionService.instance != null
+                                      ) {
 
-                                              BotService.instance
-                                                  .select(false);
-                                          }
+                                          VisionService.instance
+                                              .startVision();
 
-                                      },
-                                      500
-                                  );
+                                      }
+
+                                  },
+                                  600
+                              );
                           }
                       )
                   );
 
                   box.addView(
                       button(
-                          "7. เลือก ITEM",
-                          v -> {
-
-                              startBotService();
-
-                              new Handler()
-                                  .postDelayed(
-                                      () -> {
-
-                                          if (
-                                              BotService.instance
-                                              != null
-                                          ) {
-
-                                              BotService.instance
-                                                  .select(true);
-                                          }
-
-                                      },
-                                      500
-                                  );
-                          }
-                      )
-                  );
-
-                  box.addView(
-                      button(
-                          "8. BOT START",
-                          v -> {
-
-                              startBotService();
-
-                              new Handler()
-                                  .postDelayed(
-                                      () -> {
-
-                                          if (
-                                              BotService.instance
-                                              != null
-                                          ) {
-
-                                              BotService.instance
-                                                  .startBot();
-                                          }
-
-                                      },
-                                      500
-                                  );
-                          }
-                      )
-                  );
-
-                  box.addView(
-                      button(
-                          "9. BOT STOP",
+                          "7. VISION STOP",
                           v -> {
 
                               if (
-                                  BotService.instance
-                                  != null
+                                  VisionService.instance != null
                               ) {
 
-                                  BotService.instance
-                                      .stopBot();
+                                  VisionService.instance
+                                      .stopVision();
+
                               }
                           }
+                      )
+                  );
+
+                  box.addView(
+                      label(
+                          "ขั้นตอนทดสอบ:\n" +
+                          "เปิดเกม → Screen Capture → เปิด Vision → " +
+                          "เลือก Monster → Vision Start\n\n" +
+                          "ระบบจะค้นหาภาพที่เลือกและแสดงกรอบตำแหน่งที่พบ",
+                          14
                       )
                   );
 
@@ -481,38 +415,33 @@ jobs:
                   setContentView(scroll);
               }
 
-              void startBotService() {
-
-                  Intent i =
-                      new Intent(
-                          this,
-                          BotService.class
-                      );
-
-                  if (
-                      Build.VERSION.SDK_INT >= 26
-                  ) {
-
-                      startForegroundService(i);
-
-                  } else {
-
-                      startService(i);
-                  }
-              }
-
               void requestCapture() {
 
                   MediaProjectionManager manager =
                       (MediaProjectionManager)
-                          getSystemService(
-                              MEDIA_PROJECTION_SERVICE
-                          );
+                      getSystemService(
+                          MEDIA_PROJECTION_SERVICE
+                      );
 
                   startActivityForResult(
                       manager.createScreenCaptureIntent(),
                       CAPTURE
                   );
+              }
+
+              void startVision() {
+
+                  Intent i =
+                      new Intent(
+                          this,
+                          VisionService.class
+                      );
+
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      startForegroundService(i);
+                  } else {
+                      startService(i);
+                  }
               }
 
               @Override
@@ -532,7 +461,6 @@ jobs:
                       result != RESULT_OK ||
                       data == null
                   ) {
-
                       return;
                   }
 
@@ -552,23 +480,18 @@ jobs:
                       data
                   );
 
-                  if (
-                      Build.VERSION.SDK_INT >= 26
-                  ) {
-
+                  if (Build.VERSION.SDK_INT >= 26) {
                       startForegroundService(i);
-
                   } else {
-
                       startService(i);
                   }
               }
 
-              public static class BotAccessibilityService
+              public static class AccessService
                       extends AccessibilityService {
 
                   public static volatile
-                  BotAccessibilityService instance;
+                  AccessService instance;
 
                   int width;
                   int height;
@@ -580,57 +503,32 @@ jobs:
 
                       instance = this;
 
-                      DisplayMetrics dm =
-                          getResources()
-                              .getDisplayMetrics();
-
                       width =
-                          dm.widthPixels;
+                          getResources()
+                              .getDisplayMetrics()
+                              .widthPixels;
 
                       height =
-                          dm.heightPixels;
+                          getResources()
+                              .getDisplayMetrics()
+                              .heightPixels;
                   }
 
                   public boolean tap(
                           float x,
                           float y) {
 
-                      if (
-                          width <= 0 ||
-                          height <= 0
-                      ) {
-
-                          return false;
-                      }
-
-                      x =
-                          Math.max(
-                              0,
-                              Math.min(
-                                  x,
-                                  width - 1
-                              )
-                          );
-
-                      y =
-                          Math.max(
-                              0,
-                              Math.min(
-                                  y,
-                                  height - 1
-                              )
-                          );
-
                       Path path =
                           new Path();
 
                       path.moveTo(x, y);
 
-                      GestureDescription.StrokeDescription stroke =
+                      GestureDescription.StrokeDescription
+                          stroke =
                           new GestureDescription.StrokeDescription(
                               path,
                               0,
-                              70
+                              60
                           );
 
                       GestureDescription gesture =
@@ -647,7 +545,7 @@ jobs:
 
                   @Override
                   public void onAccessibilityEvent(
-                          AccessibilityEvent event) {
+                          android.view.accessibility.AccessibilityEvent event) {
                   }
 
                   @Override
@@ -674,8 +572,7 @@ jobs:
                   MediaProjection projection;
                   ImageReader reader;
 
-                  android.hardware.display.VirtualDisplay
-                      display;
+                  android.hardware.display.VirtualDisplay display;
 
                   HandlerThread thread;
                   Handler handler;
@@ -687,44 +584,42 @@ jobs:
 
                       NotificationManager nm =
                           (NotificationManager)
-                              getSystemService(
-                                  NOTIFICATION_SERVICE
-                              );
+                          getSystemService(
+                              NOTIFICATION_SERVICE
+                          );
 
                       nm.createNotificationChannel(
                           new NotificationChannel(
-                              "capture43",
-                              "Capture",
-                              NotificationManager
-                                  .IMPORTANCE_LOW
+                              "capture51",
+                              "DustinBot Capture",
+                              NotificationManager.IMPORTANCE_LOW
                           )
                       );
 
                       Notification n =
                           new Notification.Builder(
                               this,
-                              "capture43"
+                              "capture51"
                           )
-                              .setContentTitle(
-                                  "DustinBot V4.3"
-                              )
-                              .setContentText(
-                                  "Screen Capture"
-                              )
-                              .setSmallIcon(
-                                  android.R.drawable
-                                      .ic_menu_camera
-                              )
-                              .build();
+                          .setContentTitle(
+                              "DustinBot V5.1"
+                          )
+                          .setContentText(
+                              "Screen Capture"
+                          )
+                          .setSmallIcon(
+                              android.R.drawable.ic_menu_camera
+                          )
+                          .build();
 
                       startForeground(
-                          4302,
+                          5102,
                           n
                       );
 
                       thread =
                           new HandlerThread(
-                              "capture43"
+                              "Capture51"
                           );
 
                       thread.start();
@@ -742,7 +637,6 @@ jobs:
                           int id) {
 
                       if (intent == null) {
-
                           return START_STICKY;
                       }
 
@@ -754,9 +648,7 @@ jobs:
 
                       Intent data;
 
-                      if (
-                          Build.VERSION.SDK_INT >= 33
-                      ) {
+                      if (Build.VERSION.SDK_INT >= 33) {
 
                           data =
                               intent.getParcelableExtra(
@@ -791,9 +683,9 @@ jobs:
 
                           MediaProjectionManager manager =
                               (MediaProjectionManager)
-                                  getSystemService(
-                                      MEDIA_PROJECTION_SERVICE
-                                  );
+                              getSystemService(
+                                  MEDIA_PROJECTION_SERVICE
+                              );
 
                           projection =
                               manager.getMediaProjection(
@@ -801,9 +693,9 @@ jobs:
                                   data
                               );
 
-                          DisplayMetrics dm =
+                          android.util.DisplayMetrics dm =
                               getResources()
-                                  .getDisplayMetrics();
+                              .getDisplayMetrics();
 
                           W =
                               dm.widthPixels;
@@ -825,18 +717,17 @@ jobs:
                           );
 
                           display =
-                              projection
-                                  .createVirtualDisplay(
-                                      "DustinBot43",
-                                      W,
-                                      H,
-                                      dm.densityDpi,
-                                      DisplayManager
-                                          .VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                                      reader.getSurface(),
-                                      null,
-                                      handler
-                                  );
+                              projection.createVirtualDisplay(
+                                  "DustinBotV51",
+                                  W,
+                                  H,
+                                  dm.densityDpi,
+                                  android.hardware.display.DisplayManager
+                                      .VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                                  reader.getSurface(),
+                                  null,
+                                  handler
+                              );
 
                       } catch (Exception ignored) {
                       }
@@ -853,7 +744,6 @@ jobs:
                               r.acquireLatestImage();
 
                           if (image == null) {
-
                               return;
                           }
 
@@ -881,8 +771,7 @@ jobs:
                               Bitmap.createBitmap(
                                   realWidth,
                                   H,
-                                  Bitmap.Config
-                                      .ARGB_8888
+                                  Bitmap.Config.ARGB_8888
                               );
 
                           buffer.rewind();
@@ -902,11 +791,9 @@ jobs:
 
                           full.recycle();
 
-                          Bitmap old =
-                              latest;
+                          Bitmap old = latest;
 
-                          latest =
-                              clean;
+                          latest = clean;
 
                           if (
                               old != null &&
@@ -921,7 +808,6 @@ jobs:
                       } finally {
 
                           if (image != null) {
-
                               image.close();
                           }
                       }
@@ -929,20 +815,18 @@ jobs:
 
                   static Bitmap copy() {
 
-                      Bitmap source =
-                          latest;
+                      Bitmap b = latest;
 
                       if (
-                          source == null ||
-                          source.isRecycled()
+                          b == null ||
+                          b.isRecycled()
                       ) {
-
                           return null;
                       }
 
                       try {
 
-                          return source.copy(
+                          return b.copy(
                               Bitmap.Config.ARGB_8888,
                               false
                           );
@@ -957,22 +841,18 @@ jobs:
                   public void onDestroy() {
 
                       if (display != null) {
-
                           display.release();
                       }
 
                       if (reader != null) {
-
                           reader.close();
                       }
 
                       if (projection != null) {
-
                           projection.stop();
                       }
 
                       if (thread != null) {
-
                           thread.quitSafely();
                       }
 
@@ -982,51 +862,26 @@ jobs:
                   @Override
                   public IBinder onBind(
                           Intent intent) {
-
                       return null;
                   }
               }
 
-              public static class BotService
+              public static class VisionService
                       extends Service {
 
-                  static volatile BotService instance;
+                  static volatile VisionService instance;
 
                   WindowManager wm;
 
-                  LinearLayout panel;
+                  View selector;
+                  VisionView visionView;
 
-                  TextView status;
-                  TextView target;
-
-                  HandlerThread thread;
-                  Handler ai;
+                  Bitmap template;
 
                   boolean running;
 
-                  Bitmap monster;
-                  Bitmap item;
-
-                  View selector;
-
-                  ArrayList<PointF> route =
-                      new ArrayList<>();
-
-                  int routeIndex;
-
-                  final float threshold =
-                      75f;
-
-                  int dp(int n) {
-
-                      return (int)(
-                          n *
-                          getResources()
-                              .getDisplayMetrics()
-                              .density
-                          + .5f
-                      );
-                  }
+                  HandlerThread thread;
+                  Handler ai;
 
                   @Override
                   public void onCreate() {
@@ -1037,50 +892,48 @@ jobs:
 
                       NotificationManager nm =
                           (NotificationManager)
-                              getSystemService(
-                                  NOTIFICATION_SERVICE
-                              );
+                          getSystemService(
+                              NOTIFICATION_SERVICE
+                          );
 
                       nm.createNotificationChannel(
                           new NotificationChannel(
-                              "bot43",
-                              "Bot",
-                              NotificationManager
-                                  .IMPORTANCE_LOW
+                              "vision51",
+                              "DustinBot Vision",
+                              NotificationManager.IMPORTANCE_LOW
                           )
                       );
 
                       Notification n =
                           new Notification.Builder(
                               this,
-                              "bot43"
+                              "vision51"
                           )
-                              .setContentTitle(
-                                  "DustinBot V4.3"
-                              )
-                              .setContentText(
-                                  "Bot Panel"
-                              )
-                              .setSmallIcon(
-                                  android.R.drawable
-                                      .ic_media_play
-                              )
-                              .build();
+                          .setContentTitle(
+                              "DustinBot V5.1"
+                          )
+                          .setContentText(
+                              "Vision Engine"
+                          )
+                          .setSmallIcon(
+                              android.R.drawable.ic_menu_search
+                          )
+                          .build();
 
                       startForeground(
-                          4303,
+                          5103,
                           n
                       );
 
                       wm =
                           (WindowManager)
-                              getSystemService(
-                                  WINDOW_SERVICE
-                              );
+                          getSystemService(
+                              WINDOW_SERVICE
+                          );
 
                       thread =
                           new HandlerThread(
-                              "bot43"
+                              "Vision51"
                           );
 
                       thread.start();
@@ -1089,101 +942,67 @@ jobs:
                           new Handler(
                               thread.getLooper()
                           );
-
-                      createPanel();
                   }
 
-                  TextView text(
-                          String s,
-                          int size) {
+                  WindowManager.LayoutParams params(
+                          int w,
+                          int h) {
 
-                      TextView t =
-                          new TextView(this);
-
-                      t.setText(s);
-                      t.setTextSize(size);
-                      t.setTextColor(
-                          Color.WHITE
+                      return new WindowManager.LayoutParams(
+                          w,
+                          h,
+                          Build.VERSION.SDK_INT >= 26
+                              ?
+                              WindowManager.LayoutParams
+                                  .TYPE_APPLICATION_OVERLAY
+                              :
+                              WindowManager.LayoutParams
+                                  .TYPE_PHONE,
+                          WindowManager.LayoutParams
+                              .FLAG_NOT_FOCUSABLE |
+                          WindowManager.LayoutParams
+                              .FLAG_NOT_TOUCHABLE,
+                          PixelFormat.TRANSLUCENT
                       );
-
-                      t.setPadding(
-                          dp(6),
-                          dp(4),
-                          dp(6),
-                          dp(4)
-                      );
-
-                      return t;
                   }
 
-                  void createPanel() {
+                  void panel() {
 
-                      panel =
-                          new LinearLayout(this);
+                      if (visionView != null) {
+                          return;
+                      }
 
-                      panel.setOrientation(
-                          LinearLayout.VERTICAL
+                      visionView =
+                          new VisionView();
+
+                      WindowManager.LayoutParams p =
+                          params(-1, -1);
+
+                      p.gravity =
+                          Gravity.TOP |
+                          Gravity.LEFT;
+
+                      wm.addView(
+                          visionView,
+                          p
                       );
+                  }
 
-                      panel.setPadding(
-                          dp(8),
-                          dp(6),
-                          dp(8),
-                          dp(6)
-                      );
+                  void selectTarget() {
 
-                      panel.setBackgroundColor(
-                          0xDD111111
-                      );
+                      if (selector != null) {
+                          return;
+                      }
 
-                      status =
-                          text(
-                              "STATUS: STOP",
-                              14
-                          );
+                      final FrameSelect frame =
+                          new FrameSelect();
 
-                      target =
-                          text(
-                              "TARGET: -",
-                              12
-                          );
-
-                      panel.addView(status);
-                      panel.addView(target);
-
-                      Button start =
-                          new Button(this);
-
-                      start.setText(
-                          "BOT START / STOP"
-                      );
-
-                      start.setOnClickListener(
-                          v -> {
-
-                              if (running) {
-
-                                  stopBot();
-
-                              } else {
-
-                                  startBot();
-                              }
-                          }
-                      );
-
-                      panel.addView(
-                          start,
-                          new LinearLayout.LayoutParams(
-                              -1,
-                              dp(45)
-                          )
-                      );
+                      selector = frame;
 
                       WindowManager.LayoutParams p =
                           new WindowManager.LayoutParams(
-                              dp(280),
-                              -2,
+                              -1,
+                              -1,
                               Build.VERSION.SDK_INT >= 26
                                   ?
                                   WindowManager.LayoutParams
@@ -1192,296 +1011,226 @@ jobs:
                                   WindowManager.LayoutParams
                                       .TYPE_PHONE,
                               WindowManager.LayoutParams
-                                  .FLAG_NOT_FOCUSABLE,
+                                  .FLAG_LAYOUT_NO_LIMITS,
                               PixelFormat.TRANSLUCENT
                           );
 
-                      p.gravity =
-                          Gravity.TOP |
-                          Gravity.RIGHT;
-
-                      p.x = dp(5);
-                      p.y = dp(55);
-
                       wm.addView(
-                          panel,
+                          frame,
                           p
                       );
                   }
 
-                  void setStatus(
-                          String value) {
+                  void saveTemplate(
+                          float x,
+                          float y) {
 
-                      new Handler(
-                          Looper.getMainLooper()
-                      ).post(
-                          () ->
-                              status.setText(
-                                  "STATUS: " +
-                                  value
+                      Bitmap screen =
+                          CaptureService.copy();
+
+                      if (screen == null) {
+                          closeSelector();
+                          return;
+                      }
+
+                      int sw =
+                          Math.max(
+                              1,
+                              selector.getWidth()
+                          );
+
+                      int sh =
+                          Math.max(
+                              1,
+                              selector.getHeight()
+                          );
+
+                      int sx =
+                          Math.round(
+                              x *
+                              screen.getWidth() /
+                              (float)sw
+                          );
+
+                      int sy =
+                          Math.round(
+                              y *
+                              screen.getHeight() /
+                              (float)sh
+                          );
+
+                      int size = 80;
+
+                      int left =
+                          Math.max(
+                              0,
+                              Math.min(
+                                  screen.getWidth() - size,
+                                  sx - size / 2
                               )
-                      );
+                          );
+
+                      int top =
+                          Math.max(
+                              0,
+                              Math.min(
+                                  screen.getHeight() - size,
+                                  sy - size / 2
+                              )
+                          );
+
+                      Bitmap t =
+                          Bitmap.createBitmap(
+                              screen,
+                              left,
+                              top,
+                              size,
+                              size
+                          );
+
+                      screen.recycle();
+
+                      if (
+                          template != null &&
+                          !template.isRecycled()
+                      ) {
+                          template.recycle();
+                      }
+
+                      template = t;
+
+                      closeSelector();
+
+                      if (visionView != null) {
+                          visionView.invalidate();
+                      }
                   }
 
-                  void startBot() {
+                  void closeSelector() {
 
-                      if (
-                          BotAccessibilityService
-                              .instance == null
-                      ) {
+                      if (selector != null) {
 
-                          setStatus(
-                              "ACCESSIBILITY OFF"
-                          );
+                          try {
+                              wm.removeView(selector);
+                          } catch (Exception ignored) {
+                          }
 
-                          return;
+                          selector = null;
                       }
+                  }
 
-                      if (
-                          CaptureService.latest
-                          == null
-                      ) {
+                  void startVision() {
 
-                          setStatus(
-                              "SCREEN CAPTURE OFF"
-                          );
-
-                          return;
-                      }
-
-                      if (monster == null) {
-
-                          setStatus(
-                              "MONSTER NOT SET"
-                          );
+                      if (template == null) {
 
                           return;
                       }
 
                       running = true;
 
-                      setStatus(
-                          "SEARCHING"
-                      );
+                      panel();
 
                       ai.post(
-                          this::loop
+                          this::scanLoop
                       );
                   }
 
-                  void stopBot() {
+                  void stopVision() {
 
                       running = false;
 
-                      setStatus(
-                          "STOP"
-                      );
+                      if (visionView != null) {
+
+                          try {
+                              wm.removeView(
+                                  visionView
+                              );
+                          } catch (Exception ignored) {
+                          }
+
+                          visionView = null;
+                      }
                   }
 
-                  void loop() {
+                  void scanLoop() {
 
                       if (!running) {
-
                           return;
                       }
 
                       Bitmap screen =
                           CaptureService.copy();
 
-                      if (screen == null) {
+                      if (screen != null) {
 
-                          next(500);
-
-                          return;
-                      }
-
-                      Hit monsterHit =
-                          find(
-                              screen,
-                              monster,
-                              threshold
-                          );
-
-                      screen.recycle();
-
-                      if (monsterHit.ok) {
-
-                          setStatus(
-                              "TARGET LOCK"
-                          );
-
-                          target.setText(
-                              "TARGET: " +
-                              monsterHit.x +
-                              "," +
-                              monsterHit.y +
-                              " SCORE " +
-                              String.format(
-                                  "%.1f",
-                                  monsterHit.score
-                              )
-                          );
-
-                          BotAccessibilityService a =
-                              BotAccessibilityService
-                                  .instance;
-
-                          if (a != null) {
-
-                              a.tap(
-                                  monsterHit.x,
-                                  monsterHit.y
+                          Result r =
+                              find(
+                                  screen,
+                                  template
                               );
 
-                              setStatus(
-                                  "ATTACKING"
+                          screen.recycle();
+
+                          if (visionView != null) {
+
+                              visionView.x = r.x;
+                              visionView.y = r.y;
+                              visionView.score = r.score;
+                              visionView.found = r.found;
+
+                              new Handler(
+                                  android.os.Looper
+                                      .getMainLooper()
+                              ).post(
+                                  () ->
+                                      visionView.invalidate()
                               );
                           }
-
-                          next(1200);
-
-                          return;
                       }
 
-                      if (item != null) {
-
-                          Bitmap lootScreen =
-                              CaptureService.copy();
-
-                          if (
-                              lootScreen != null
-                          ) {
-
-                              Hit itemHit =
-                                  find(
-                                      lootScreen,
-                                      item,
-                                      threshold
-                                  );
-
-                              lootScreen.recycle();
-
-                              if (itemHit.ok) {
-
-                                  setStatus(
-                                      "LOOTING"
-                                  );
-
-                                  BotAccessibilityService a =
-                                      BotAccessibilityService
-                                          .instance;
-
-                                  if (a != null) {
-
-                                      a.tap(
-                                          itemHit.x,
-                                          itemHit.y
-                                      );
-                                  }
-
-                                  next(900);
-
-                                  return;
-                              }
-                          }
-                      }
-
-                      if (!route.isEmpty()) {
-
-                          PointF p =
-                              route.get(
-                                  routeIndex++
-                                  % route.size()
-                              );
-
-                          BotAccessibilityService a =
-                              BotAccessibilityService
-                                  .instance;
-
-                          if (a != null) {
-
-                              a.tap(
-                                  p.x,
-                                  p.y
-                              );
-                          }
-
-                          setStatus(
-                              "WALKING"
-                          );
-
-                          next(1800);
-
-                          return;
-                      }
-
-                      setStatus(
-                          "SEARCHING"
+                      ai.postDelayed(
+                          this::scanLoop,
+                          900
                       );
-
-                      next(500);
                   }
 
-                  void next(long delay) {
+                  static class Result {
 
-                      if (running) {
-
-                          ai.postDelayed(
-                              this::loop,
-                              delay
-                          );
-                      }
-                  }
-
-                  static class Hit {
-
-                      boolean ok;
+                      boolean found;
                       float score;
                       int x;
                       int y;
                   }
 
-                  static Hit find(
+                  Result find(
                           Bitmap screen,
-                          Bitmap template,
-                          float limit) {
+                          Bitmap target) {
 
-                      Hit out =
-                          new Hit();
+                      Result out =
+                          new Result();
 
                       if (
                           screen == null ||
-                          template == null
+                          target == null
                       ) {
-
                           return out;
                       }
 
                       int tw =
                           Math.min(
-                              64,
-                              template.getWidth()
+                              80,
+                              target.getWidth()
                           );
 
                       int th =
                           Math.min(
-                              64,
-                              template.getHeight()
+                              80,
+                              target.getHeight()
                           );
-
-                      if (
-                          tw < 12 ||
-                          th < 12 ||
-                          screen.getWidth() < tw ||
-                          screen.getHeight() < th
-                      ) {
-
-                          return out;
-                      }
 
                       Bitmap small =
                           Bitmap.createScaledBitmap(
-                              template,
+                              target,
                               tw,
                               th,
                               false
@@ -1490,36 +1239,38 @@ jobs:
                       double best =
                           Double.MAX_VALUE;
 
-                      int bestX = 0;
-                      int bestY = 0;
+                      int bx = 0;
+                      int by = 0;
+
+                      int step = 10;
 
                       for (
                           int y = 0;
                           y <=
                               screen.getHeight() - th;
-                          y += 8
+                          y += step
                       ) {
 
                           for (
                               int x = 0;
                               x <=
                                   screen.getWidth() - tw;
-                              x += 8
+                              x += step
                           ) {
 
                               double sum = 0;
                               int count = 0;
 
                               for (
-                                  int yy = 4;
-                                  yy < th - 4;
-                                  yy += 6
+                                  int yy = 5;
+                                  yy < th - 5;
+                                  yy += 7
                               ) {
 
                                   for (
-                                      int xx = 4;
-                                      xx < tw - 4;
-                                      xx += 6
+                                      int xx = 5;
+                                      xx < tw - 5;
+                                      xx += 7
                                   ) {
 
                                       int a =
@@ -1538,13 +1289,15 @@ jobs:
                                           Math.abs(
                                               Color.red(a) -
                                               Color.red(b)
-                                          ) +
+                                          );
 
+                                      sum +=
                                           Math.abs(
                                               Color.green(a) -
                                               Color.green(b)
-                                          ) +
+                                          );
 
+                                      sum +=
                                           Math.abs(
                                               Color.blue(a) -
                                               Color.blue(b)
@@ -1566,416 +1319,193 @@ jobs:
                               ) {
 
                                   best = score;
-
-                                  bestX = x;
-                                  bestY = y;
+                                  bx = x;
+                                  by = y;
                               }
                           }
                       }
 
                       small.recycle();
 
+                      out.x =
+                          bx + tw / 2;
+
+                      out.y =
+                          by + th / 2;
+
                       out.score =
                           (float)best;
 
-                      out.x =
-                          bestX +
-                          tw / 2;
-
-                      out.y =
-                          bestY +
-                          th / 2;
-
-                      out.ok =
-                          best <= limit;
+                      out.found =
+                          best < 80;
 
                       return out;
                   }
 
-                  void select(
-                          boolean itemMode) {
+                  class FrameSelect
+                          extends View {
 
-                      if (
-                          CaptureService.latest
-                          == null
-                      ) {
-
-                          setStatus(
-                              "SCREEN CAPTURE OFF"
+                      Paint paint =
+                          new Paint(
+                              Paint.ANTI_ALIAS_FLAG
                           );
 
-                          return;
+                      FrameSelect() {
+
+                          super(
+                              VisionService.this
+                          );
+
+                          paint.setColor(
+                              Color.WHITE
+                          );
+
+                          paint.setTextSize(
+                              42
+                          );
+
+                          setBackgroundColor(
+                              Color.TRANSPARENT
+                          );
                       }
 
-                      if (selector != null) {
+                      @Override
+                      protected void onDraw(
+                              android.graphics.Canvas c) {
 
-                          return;
+                          super.onDraw(c);
+
+                          c.drawText(
+                              "แตะ Monster",
+                              30,
+                              55,
+                              paint
+                          );
                       }
 
-                      FrameLayout frame =
-                          new FrameLayout(this);
+                      @Override
+                      public boolean onTouchEvent(
+                              MotionEvent e) {
 
-                      TextView title =
-                          text(
-                              itemMode
-                                  ?
-                                  "แตะ ITEM"
-                                  :
-                                  "แตะ MONSTER",
-                              16
-                          );
+                          if (
+                              e.getAction() ==
+                              MotionEvent.ACTION_UP
+                          ) {
 
-                      title.setBackgroundColor(
-                          0xCC111111
-                      );
-
-                      frame.addView(
-                          title,
-                          new FrameLayout.LayoutParams(
-                              -1,
-                              dp(60)
-                          )
-                      );
-
-                      Button cancel =
-                          new Button(this);
-
-                      cancel.setText(
-                          "CANCEL"
-                      );
-
-                      FrameLayout.LayoutParams cp =
-                          new FrameLayout.LayoutParams(
-                              dp(110),
-                              dp(60)
-                          );
-
-                      cp.gravity =
-                          Gravity.TOP |
-                          Gravity.RIGHT;
-
-                      frame.addView(
-                          cancel,
-                          cp
-                      );
-
-                      View touch =
-                          new View(this);
-
-                      frame.addView(
-                          touch,
-                          new FrameLayout.LayoutParams(
-                              -1,
-                              -1
-                          )
-                      );
-
-                      title.bringToFront();
-                      cancel.bringToFront();
-
-                      touch.setOnTouchListener(
-                          (v,e) -> {
-
-                              if (
-                                  e.getAction()
-                                  ==
-                                  MotionEvent.ACTION_UP
-                              ) {
-
-                                  saveTemplate(
-                                      e.getX(),
-                                      e.getY(),
-                                      itemMode
-                                  );
-
-                                  return true;
-                              }
+                              saveTemplate(
+                                  e.getX(),
+                                  e.getY()
+                              );
 
                               return true;
                           }
-                      );
 
-                      cancel.setOnClickListener(
-                          v -> closeSelector()
-                      );
-
-                      selector = frame;
-
-                      wm.addView(
-                          frame,
-                          fullParams()
-                      );
-
-                      setStatus(
-                          itemMode
-                              ?
-                              "SELECT ITEM"
-                              :
-                              "SELECT MONSTER"
-                      );
+                          return true;
+                      }
                   }
 
-                  void saveTemplate(
-                          float x,
-                          float y,
-                          boolean itemMode) {
+                  class VisionView
+                          extends View {
 
-                      Bitmap screen =
-                          CaptureService.copy();
-
-                      if (screen == null) {
-
-                          closeSelector();
-
-                          return;
-                      }
-
-                      int vw =
-                          Math.max(
-                              1,
-                              selector.getWidth()
+                      Paint boxPaint =
+                          new Paint(
+                              Paint.ANTI_ALIAS_FLAG
                           );
 
-                      int vh =
-                          Math.max(
-                              1,
-                              selector.getHeight()
+                      Paint textPaint =
+                          new Paint(
+                              Paint.ANTI_ALIAS_FLAG
                           );
 
-                      int sx =
-                          Math.round(
-                              x *
-                              screen.getWidth() /
-                              (float)vw
+                      int x;
+                      int y;
+
+                      float score;
+
+                      boolean found;
+
+                      VisionView() {
+
+                          super(
+                              VisionService.this
                           );
 
-                      int sy =
-                          Math.round(
-                              y *
-                              screen.getHeight() /
-                              (float)vh
+                          boxPaint.setStyle(
+                              Paint.Style.STROKE
                           );
 
-                      int size = 64;
-
-                      int left =
-                          Math.max(
-                              0,
-                              Math.min(
-                                  screen.getWidth()
-                                      - size,
-                                  sx -
-                                  size / 2
-                              )
+                          boxPaint.setStrokeWidth(
+                              6
                           );
 
-                      int top =
-                          Math.max(
-                              0,
-                              Math.min(
-                                  screen.getHeight()
-                                      - size,
-                                  sy -
-                                  size / 2
-                              )
+                          boxPaint.setColor(
+                              Color.GREEN
                           );
 
-                      Bitmap template =
-                          Bitmap.createBitmap(
-                              screen,
-                              left,
-                              top,
-                              size,
-                              size
+                          textPaint.setTextSize(
+                              32
                           );
 
-                      screen.recycle();
-
-                      if (itemMode) {
-
-                          if (
-                              item != null &&
-                              !item.isRecycled()
-                          ) {
-
-                              item.recycle();
-                          }
-
-                          item =
-                              template;
-
-                          setStatus(
-                              "ITEM READY"
+                          textPaint.setColor(
+                              Color.WHITE
                           );
 
-                      } else {
-
-                          if (
-                              monster != null &&
-                              !monster.isRecycled()
-                          ) {
-
-                              monster.recycle();
-                          }
-
-                          monster =
-                              template;
-
-                          setStatus(
-                              "MONSTER READY"
+                          setBackgroundColor(
+                              Color.TRANSPARENT
                           );
                       }
 
-                      closeSelector();
-                  }
+                      @Override
+                      protected void onDraw(
+                              android.graphics.Canvas c) {
 
-                  void routeMode() {
+                          super.onDraw(c);
 
-                      if (selector != null) {
+                          if (found) {
 
-                          return;
-                      }
-
-                      FrameLayout frame =
-                          new FrameLayout(this);
-
-                      TextView title =
-                          text(
-                              "แตะจุดเดิน แล้วกด DONE",
-                              15
-                          );
-
-                      title.setBackgroundColor(
-                          0xCC111111
-                      );
-
-                      frame.addView(
-                          title,
-                          new FrameLayout.LayoutParams(
-                              -1,
-                              dp(60)
-                          )
-                      );
-
-                      Button done =
-                          new Button(this);
-
-                      done.setText(
-                          "DONE"
-                      );
-
-                      FrameLayout.LayoutParams dp =
-                          new FrameLayout.LayoutParams(
-                              dp(110),
-                              dp(60)
-                          );
-
-                      dp.gravity =
-                          Gravity.TOP |
-                          Gravity.RIGHT;
-
-                      frame.addView(
-                          done,
-                          dp
-                      );
-
-                      View touch =
-                          new View(this);
-
-                      frame.addView(
-                          touch,
-                          new FrameLayout.LayoutParams(
-                              -1,
-                              -1
-                          )
-                      );
-
-                      title.bringToFront();
-                      done.bringToFront();
-
-                      route.clear();
-                      routeIndex = 0;
-
-                      touch.setOnTouchListener(
-                          (v,e) -> {
-
-                              if (
-                                  e.getAction()
-                                  ==
-                                  MotionEvent.ACTION_UP
-                              ) {
-
-                                  route.add(
-                                      new PointF(
-                                          e.getX(),
-                                          e.getY()
-                                      )
-                                  );
-
-                                  return true;
-                              }
-
-                              return true;
-                          }
-                      );
-
-                      done.setOnClickListener(
-                          v -> {
-
-                              closeSelector();
-
-                              setStatus(
-                                  "ROUTE " +
-                                  route.size()
-                              );
-                          }
-                      );
-
-                      selector = frame;
-
-                      wm.addView(
-                          frame,
-                          fullParams()
-                      );
-
-                      setStatus(
-                          "RECORD ROUTE"
-                      );
-                  }
-
-                  WindowManager.LayoutParams
-                  fullParams() {
-
-                      return new WindowManager.LayoutParams(
-                          -1,
-                          -1,
-                          Build.VERSION.SDK_INT >= 26
-                              ?
-                              WindowManager.LayoutParams
-                                  .TYPE_APPLICATION_OVERLAY
-                              :
-                              WindowManager.LayoutParams
-                                  .TYPE_PHONE,
-                          WindowManager.LayoutParams
-                              .FLAG_LAYOUT_NO_LIMITS,
-                          PixelFormat.TRANSLUCENT
-                      );
-                  }
-
-                  void closeSelector() {
-
-                      if (selector != null) {
-
-                          try {
-
-                              wm.removeView(
-                                  selector
+                              c.drawRect(
+                                  x - 55,
+                                  y - 55,
+                                  x + 55,
+                                  y + 55,
+                                  boxPaint
                               );
 
-                          } catch (Exception ignored) {
-                          }
+                              c.drawText(
+                                  "TARGET",
+                                  x - 55,
+                                  y - 70,
+                                  textPaint
+                              );
 
-                          selector = null;
+                              c.drawText(
+                                  "X:" + x +
+                                  " Y:" + y,
+                                  20,
+                                  60,
+                                  textPaint
+                              );
+
+                              c.drawText(
+                                  "SCORE:" +
+                                  String.format(
+                                      "%.1f",
+                                      score
+                                  ),
+                                  20,
+                                  100,
+                                  textPaint
+                              );
+
+                          } else {
+
+                              c.drawText(
+                                  "VISION: SEARCHING",
+                                  20,
+                                  60,
+                                  textPaint
+                              );
+                          }
                       }
                   }
 
@@ -1986,36 +1516,25 @@ jobs:
 
                       closeSelector();
 
-                      if (panel != null) {
+                      if (visionView != null) {
 
                           try {
-
                               wm.removeView(
-                                  panel
+                                  visionView
                               );
-
                           } catch (Exception ignored) {
                           }
                       }
 
                       if (
-                          monster != null &&
-                          !monster.isRecycled()
+                          template != null &&
+                          !template.isRecycled()
                       ) {
 
-                          monster.recycle();
-                      }
-
-                      if (
-                          item != null &&
-                          !item.isRecycled()
-                      ) {
-
-                          item.recycle();
+                          template.recycle();
                       }
 
                       if (thread != null) {
-
                           thread.quitSafely();
                       }
 
@@ -2027,7 +1546,6 @@ jobs:
                   @Override
                   public IBinder onBind(
                           Intent intent) {
-
                       return null;
                   }
               }
@@ -2050,6 +1568,7 @@ jobs:
 
           test -s app/build/outputs/apk/debug/app-debug.apk
 
+          echo "APK CREATED"
           ls -lh app/build/outputs/apk/debug/app-debug.apk
 
           sha256sum app/build/outputs/apk/debug/app-debug.apk
@@ -2057,6 +1576,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: DustinBotV4.3-APK
+          name: DustinBot-V5.1
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
