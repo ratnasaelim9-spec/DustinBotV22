@@ -1,4 +1,4 @@
-name: Build DustinBot V6 AUTO
+name: Build DustinBot V6 AUTO FIXED 2
  
 on:
  workflow_dispatch:
