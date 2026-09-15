@@ -1,4 +1,4 @@
-name: Build DustinBot V5.1
+name: Build DustinBot V6
 
 on:
   workflow_dispatch:
@@ -20,20 +20,17 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Setup Gradle
+      - name: Setup Gradle 8.7
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.7"
 
-      - name: Create Android Project
+      - name: Create Android project
         shell: bash
         run: |
           set -e
 
-          rm -rf app
-          rm -f build.gradle settings.gradle gradle.properties
-
-          mkdir -p app/src/main/java/com/dustinbot/v51
+          mkdir -p app/src/main/java/com/dustinbot/v6
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
 
@@ -54,7 +51,7 @@ jobs:
               }
           }
 
-          rootProject.name = "DustinBotV51"
+          rootProject.name = "DustinBotV6"
           include(":app")
           EOF
 
@@ -75,15 +72,15 @@ jobs:
           }
 
           android {
-              namespace "com.dustinbot.v51"
+              namespace "com.dustinbot.v6"
               compileSdk 35
 
               defaultConfig {
-                  applicationId "com.dustinbot.v51"
+                  applicationId "com.dustinbot.v6"
                   minSdk 26
                   targetSdk 35
-                  versionCode 51
-                  versionName "5.1"
+                  versionCode 60
+                  versionName "6.0"
               }
           }
           EOF
@@ -116,35 +113,45 @@ jobs:
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-              <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+              <uses-permission
+                  android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+              <uses-permission
+                  android:name="android.permission.FOREGROUND_SERVICE" />
+
+              <uses-permission
+                  android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
               <application
                   android:allowBackup="false"
-                  android:label="DustinBot V5.1"
+                  android:label="DustinBot V6"
                   android:theme="@style/AppTheme">
 
                   <activity
                       android:name=".MainActivity"
                       android:exported="true">
+
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
+
                   </activity>
 
                   <service
                       android:name=".MainActivity$AccessService"
                       android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
                       android:exported="true">
+
                       <intent-filter>
-                          <action android:name="android.accessibilityservice.AccessibilityService" />
+                          <action
+                              android:name="android.accessibilityservice.AccessibilityService" />
                       </intent-filter>
 
                       <meta-data
                           android:name="android.accessibilityservice"
                           android:resource="@xml/accessibility_service_config" />
+
                   </service>
 
                   <service
@@ -153,15 +160,16 @@ jobs:
                       android:foregroundServiceType="mediaProjection" />
 
                   <service
-                      android:name=".MainActivity$VisionService"
+                      android:name=".MainActivity$BotService"
                       android:exported="false" />
 
               </application>
+
           </manifest>
           EOF
 
-          cat > app/src/main/java/com/dustinbot/v51/MainActivity.java <<'EOF'
-          package com.dustinbot.v51;
+          cat > app/src/main/java/com/dustinbot/v6/MainActivity.java <<'EOF'
+          package com.dustinbot.v6;
 
           import android.accessibilityservice.AccessibilityService;
           import android.accessibilityservice.GestureDescription;
@@ -181,18 +189,18 @@ jobs:
           import android.media.ImageReader;
           import android.media.projection.MediaProjection;
           import android.media.projection.MediaProjectionManager;
+          import android.net.Uri;
           import android.os.Build;
           import android.os.Bundle;
           import android.os.Handler;
           import android.os.HandlerThread;
           import android.os.IBinder;
           import android.provider.Settings;
-          import android.net.Uri;
-          import android.view.Gravity;
           import android.view.MotionEvent;
           import android.view.View;
           import android.view.WindowManager;
           import android.widget.Button;
+          import android.widget.EditText;
           import android.widget.LinearLayout;
           import android.widget.ScrollView;
           import android.widget.TextView;
@@ -202,29 +210,44 @@ jobs:
 
           public class MainActivity extends Activity {
 
-              static final int REQUEST_CAPTURE = 5101;
+              static final int CAPTURE_REQUEST = 6001;
+
+              EditText attackX;
+              EditText attackY;
+              EditText moveX;
+              EditText moveY;
+              EditText lootX;
+              EditText lootY;
+
+              TextView status;
 
               int dp(int n) {
                   return (int)(n *
                       getResources().getDisplayMetrics().density + 0.5f);
               }
 
-              TextView text(String s, int size) {
-                  TextView v = new TextView(this);
-                  v.setText(s);
-                  v.setTextSize(size);
-                  v.setPadding(
-                      dp(10), dp(10),
-                      dp(10), dp(10)
-                  );
-                  return v;
+              Button button(String text, View.OnClickListener listener) {
+                  Button b = new Button(this);
+                  b.setText(text);
+                  b.setOnClickListener(listener);
+                  return b;
               }
 
-              Button button(String s, View.OnClickListener l) {
-                  Button b = new Button(this);
-                  b.setText(s);
-                  b.setOnClickListener(l);
-                  return b;
+              EditText field(String value) {
+                  EditText e = new EditText(this);
+                  e.setText(value);
+                  e.setInputType(2);
+                  return e;
+              }
+
+              int number(EditText e, int fallback) {
+                  try {
+                      return Integer.parseInt(
+                          e.getText().toString()
+                      );
+                  } catch (Exception ex) {
+                      return fallback;
+                  }
               }
 
               @Override
@@ -234,24 +257,21 @@ jobs:
                   LinearLayout root = new LinearLayout(this);
                   root.setOrientation(LinearLayout.VERTICAL);
                   root.setPadding(
-                      dp(12), dp(12),
-                      dp(12), dp(24)
+                      dp(12),
+                      dp(10),
+                      dp(12),
+                      dp(20)
                   );
 
-                  root.addView(text(
-                      "DUSTIN BOT V5.1",
-                      26
-                  ));
+                  TextView title = new TextView(this);
+                  title.setText("DUSTIN BOT V6");
+                  title.setTextSize(28);
+                  root.addView(title);
 
-                  root.addView(text(
-                      "Vision Test / Target Lock",
-                      18
-                  ));
-
-                  root.addView(text(
-                      "ทดสอบ Screen Capture + Vision + Accessibility",
-                      14
-                  ));
+                  status = new TextView(this);
+                  status.setText("สถานะ: STOP");
+                  status.setTextSize(17);
+                  root.addView(status);
 
                   root.addView(button(
                       "1. เปิด Accessibility",
@@ -264,15 +284,14 @@ jobs:
 
                   root.addView(button(
                       "2. เปิด Overlay",
-                      v -> {
-                          Intent i = new Intent(
+                      v -> startActivity(
+                          new Intent(
                               Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                               Uri.parse(
                                   "package:" + getPackageName()
                               )
-                          );
-                          startActivity(i);
-                      }
+                          )
+                      )
                   ));
 
                   root.addView(button(
@@ -281,61 +300,71 @@ jobs:
                   ));
 
                   root.addView(button(
-                      "4. START VISION",
-                      v -> startVision()
+                      "4. เลือกมอนสเตอร์",
+                      v -> startBot(true)
+                  ));
+
+                  TextView info = new TextView(this);
+                  info.setText(
+                      "ตั้งค่าพิกัดปุ่มในเกม"
+                  );
+                  info.setTextSize(16);
+                  root.addView(info);
+
+                  attackX = field("650");
+                  attackY = field("1350");
+
+                  moveX = field("360");
+                  moveY = field("1450");
+
+                  lootX = field("360");
+                  lootY = field("1450");
+
+                  root.addView(attackX);
+                  root.addView(attackY);
+                  root.addView(moveX);
+                  root.addView(moveY);
+                  root.addView(lootX);
+                  root.addView(lootY);
+
+                  root.addView(button(
+                      "5. START BOT",
+                      v -> startBot(false)
                   ));
 
                   root.addView(button(
-                      "5. SELECT MONSTER",
-                      v -> {
-                          startVision();
-
-                          new Handler().postDelayed(() -> {
-                              if (VisionService.instance != null) {
-                                  VisionService.instance.selectTarget();
-                              }
-                          }, 500);
-                      }
+                      "6. STOP BOT",
+                      v -> stopBot()
                   ));
 
                   root.addView(button(
-                      "6. VISION START",
+                      "ทดสอบโจมตี",
                       v -> {
-                          startVision();
-
-                          new Handler().postDelayed(() -> {
-                              if (VisionService.instance != null) {
-                                  VisionService.instance.startScan();
-                              }
-                          }, 500);
-                      }
-                  ));
-
-                  root.addView(button(
-                      "7. VISION STOP",
-                      v -> {
-                          if (VisionService.instance != null) {
-                              VisionService.instance.stopScan();
+                          if (AccessService.instance != null) {
+                              AccessService.instance.tap(
+                                  number(attackX,650),
+                                  number(attackY,1350)
+                              );
                           }
                       }
                   ));
 
-                  root.addView(text(
-                      "วิธีทดสอบ\n\n" +
-                      "1. เปิดเกม\n" +
-                      "2. เปิด Accessibility\n" +
-                      "3. เปิด Overlay\n" +
-                      "4. กด SCREEN CAPTURE\n" +
-                      "5. กด SELECT MONSTER\n" +
-                      "6. แตะตัว Monster ในเกม\n" +
-                      "7. กด VISION START\n\n" +
-                      "ระบบจะค้นหาภาพ Monster ที่เลือก " +
-                      "และแสดงกรอบตำแหน่งที่พบ",
-                      14
-                  ));
+                  TextView desc = new TextView(this);
+                  desc.setText(
+                      "SEARCH → TARGET → ATTACK → CHECK LOOT → LOOT → SEARCH"
+                  );
+                  desc.setTextSize(14);
+                  desc.setPadding(
+                      0,
+                      dp(15),
+                      0,
+                      0
+                  );
+                  root.addView(desc);
 
                   ScrollView scroll = new ScrollView(this);
                   scroll.addView(root);
+
                   setContentView(scroll);
               }
 
@@ -348,14 +377,50 @@ jobs:
 
                   startActivityForResult(
                       manager.createScreenCaptureIntent(),
-                      REQUEST_CAPTURE
+                      CAPTURE_REQUEST
                   );
               }
 
-              void startVision() {
+              void startBot(boolean select) {
+
                   Intent i = new Intent(
                       this,
-                      VisionService.class
+                      BotService.class
+                  );
+
+                  i.putExtra(
+                      "attackX",
+                      number(attackX,650)
+                  );
+
+                  i.putExtra(
+                      "attackY",
+                      number(attackY,1350)
+                  );
+
+                  i.putExtra(
+                      "moveX",
+                      number(moveX,360)
+                  );
+
+                  i.putExtra(
+                      "moveY",
+                      number(moveY,1450)
+                  );
+
+                  i.putExtra(
+                      "lootX",
+                      number(lootX,360)
+                  );
+
+                  i.putExtra(
+                      "lootY",
+                      number(lootY,1450)
+                  );
+
+                  i.putExtra(
+                      "select",
+                      select
                   );
 
                   if (Build.VERSION.SDK_INT >= 26) {
@@ -363,6 +428,30 @@ jobs:
                   } else {
                       startService(i);
                   }
+
+                  status.setText(
+                      select
+                          ? "สถานะ: แตะมอนสเตอร์ที่ต้องการ"
+                          : "สถานะ: BOT RUNNING"
+                  );
+              }
+
+              void stopBot() {
+
+                  Intent i = new Intent(
+                      this,
+                      BotService.class
+                  );
+
+                  i.setAction("STOP");
+
+                  if (Build.VERSION.SDK_INT >= 26) {
+                      startForegroundService(i);
+                  } else {
+                      startService(i);
+                  }
+
+                  status.setText("สถานะ: STOP");
               }
 
               @Override
@@ -377,55 +466,59 @@ jobs:
                       data
                   );
 
-                  if (request != REQUEST_CAPTURE ||
-                      result != RESULT_OK ||
-                      data == null) {
-                      return;
-                  }
+                  if (
+                      request == CAPTURE_REQUEST &&
+                      result == RESULT_OK &&
+                      data != null
+                  ) {
 
-                  Intent i = new Intent(
-                      this,
-                      CaptureService.class
-                  );
+                      Intent i = new Intent(
+                          this,
+                          CaptureService.class
+                      );
 
-                  i.putExtra("resultCode", result);
-                  i.putExtra("data", data);
+                      i.putExtra(
+                          "resultCode",
+                          result
+                      );
 
-                  if (Build.VERSION.SDK_INT >= 26) {
-                      startForegroundService(i);
-                  } else {
-                      startService(i);
+                      i.putExtra(
+                          "data",
+                          data
+                      );
+
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          startForegroundService(i);
+                      } else {
+                          startService(i);
+                      }
                   }
               }
 
               public static class AccessService
                       extends AccessibilityService {
 
-                  static volatile AccessService instance;
+                  static AccessService instance;
 
                   @Override
                   public void onServiceConnected() {
-                      super.onServiceConnected();
                       instance = this;
                   }
 
-                  public boolean tap(
-                          float x,
-                          float y) {
+                  boolean tap(float x, float y) {
 
                       Path path = new Path();
-                      path.moveTo(x, y);
-
-                      GestureDescription.StrokeDescription stroke =
-                          new GestureDescription.StrokeDescription(
-                              path,
-                              0,
-                              60
-                          );
+                      path.moveTo(x,y);
 
                       GestureDescription gesture =
                           new GestureDescription.Builder()
-                              .addStroke(stroke)
+                              .addStroke(
+                                  new GestureDescription.StrokeDescription(
+                                      path,
+                                      0,
+                                      60
+                                  )
+                              )
                               .build();
 
                       return dispatchGesture(
@@ -435,27 +528,27 @@ jobs:
                       );
                   }
 
-                  public boolean swipe(
-                          float x1,
-                          float y1,
-                          float x2,
-                          float y2,
-                          long duration) {
+                  boolean swipe(
+                      float x1,
+                      float y1,
+                      float x2,
+                      float y2,
+                      long duration
+                  ) {
 
                       Path path = new Path();
-                      path.moveTo(x1, y1);
-                      path.lineTo(x2, y2);
-
-                      GestureDescription.StrokeDescription stroke =
-                          new GestureDescription.StrokeDescription(
-                              path,
-                              0,
-                              duration
-                          );
+                      path.moveTo(x1,y1);
+                      path.lineTo(x2,y2);
 
                       GestureDescription gesture =
                           new GestureDescription.Builder()
-                              .addStroke(stroke)
+                              .addStroke(
+                                  new GestureDescription.StrokeDescription(
+                                      path,
+                                      0,
+                                      duration
+                                  )
+                              )
                               .build();
 
                       return dispatchGesture(
@@ -466,4 +559,1119 @@ jobs:
                   }
 
                   @Override
-                  public void
+                  public void onAccessibilityEvent(
+                      android.view.accessibility.AccessibilityEvent event
+                  ) {}
+
+                  @Override
+                  public void onInterrupt() {}
+              }
+
+              public static class CaptureService
+                      extends Service {
+
+                  static MediaProjection projection;
+                  static ImageReader reader;
+                  static Bitmap latest;
+                  static int width;
+                  static int height;
+
+                  @Override
+                  public int onStartCommand(
+                      Intent intent,
+                      int flags,
+                      int startId
+                  ) {
+
+                      try {
+
+                          NotificationManager nm =
+                              (NotificationManager)
+                                  getSystemService(
+                                      NOTIFICATION_SERVICE
+                                  );
+
+                          if (Build.VERSION.SDK_INT >= 26) {
+                              nm.createNotificationChannel(
+                                  new NotificationChannel(
+                                      "capture6",
+                                      "DustinBot Capture",
+                                      NotificationManager.IMPORTANCE_LOW
+                                  )
+                              );
+                          }
+
+                          Notification notification;
+
+                          if (Build.VERSION.SDK_INT >= 26) {
+                              notification =
+                                  new Notification.Builder(
+                                      this,
+                                      "capture6"
+                                  )
+                                  .setContentTitle(
+                                      "DustinBot V6"
+                                  )
+                                  .setContentText(
+                                      "Screen Capture"
+                                  )
+                                  .setSmallIcon(
+                                      android.R.drawable.ic_menu_view
+                                  )
+                                  .build();
+                          } else {
+                              notification =
+                                  new Notification.Builder(this)
+                                  .setContentTitle(
+                                      "DustinBot V6"
+                                  )
+                                  .setSmallIcon(
+                                      android.R.drawable.ic_menu_view
+                                  )
+                                  .build();
+                          }
+
+                          startForeground(
+                              6002,
+                              notification
+                          );
+
+                          MediaProjectionManager manager =
+                              (MediaProjectionManager)
+                                  getSystemService(
+                                      MEDIA_PROJECTION_SERVICE
+                                  );
+
+                          if (Build.VERSION.SDK_INT >= 33) {
+                              projection =
+                                  manager.getMediaProjection(
+                                      intent.getIntExtra(
+                                          "resultCode",
+                                          0
+                                      ),
+                                      intent.getParcelableExtra(
+                                          "data",
+                                          Intent.class
+                                      )
+                                  );
+                          } else {
+                              projection =
+                                  manager.getMediaProjection(
+                                      intent.getIntExtra(
+                                          "resultCode",
+                                          0
+                                      ),
+                                      intent.getParcelableExtra(
+                                          "data"
+                                      )
+                                  );
+                          }
+
+                          width =
+                              getResources()
+                                  .getDisplayMetrics()
+                                  .widthPixels;
+
+                          height =
+                              getResources()
+                                  .getDisplayMetrics()
+                                  .heightPixels;
+
+                          reader =
+                              ImageReader.newInstance(
+                                  width,
+                                  height,
+                                  PixelFormat.RGBA_8888,
+                                  2
+                              );
+
+                          projection.createVirtualDisplay(
+                              "DustinBotV6",
+                              width,
+                              height,
+                              (int)getResources()
+                                  .getDisplayMetrics()
+                                  .density,
+                              16,
+                              reader.getSurface(),
+                              null,
+                              null
+                          );
+
+                          reader.setOnImageAvailableListener(
+                              r -> {
+
+                                  Image image = null;
+
+                                  try {
+
+                                      image =
+                                          r.acquireLatestImage();
+
+                                      if (image == null) {
+                                          return;
+                                      }
+
+                                      Image.Plane plane =
+                                          image.getPlanes()[0];
+
+                                      ByteBuffer buffer =
+                                          plane.getBuffer();
+
+                                      int pixelStride =
+                                          plane.getPixelStride();
+
+                                      int rowStride =
+                                          plane.getRowStride();
+
+                                      int rowWidth =
+                                          rowStride /
+                                          pixelStride;
+
+                                      Bitmap bitmap =
+                                          Bitmap.createBitmap(
+                                              rowWidth,
+                                              image.getHeight(),
+                                              Bitmap.Config.ARGB_8888
+                                          );
+
+                                      buffer.rewind();
+                                      bitmap.copyPixelsFromBuffer(
+                                          buffer
+                                      );
+
+                                      Bitmap crop =
+                                          Bitmap.createBitmap(
+                                              bitmap,
+                                              0,
+                                              0,
+                                              width,
+                                              height
+                                          );
+
+                                      Bitmap old = latest;
+                                      latest = crop;
+
+                                      bitmap.recycle();
+
+                                      if (
+                                          old != null &&
+                                          !old.isRecycled()
+                                      ) {
+                                          old.recycle();
+                                      }
+
+                                  } catch (Exception ignored) {
+
+                                  } finally {
+
+                                      if (image != null) {
+                                          image.close();
+                                      }
+                                  }
+
+                              },
+                              new Handler(
+                                  getMainLooper()
+                              )
+                          );
+
+                      } catch (Exception ignored) {}
+
+                      return START_STICKY;
+                  }
+
+                  static synchronized Bitmap copy() {
+
+                      if (
+                          latest == null ||
+                          latest.isRecycled()
+                      ) {
+                          return null;
+                      }
+
+                      return latest.copy(
+                          Bitmap.Config.ARGB_8888,
+                          false
+                      );
+                  }
+
+                  @Override
+                  public IBinder onBind(Intent intent) {
+                      return null;
+                  }
+              }
+
+              public static class BotService
+                      extends Service {
+
+                  static BotService instance;
+
+                  Handler handler;
+                  HandlerThread thread;
+                  WindowManager windowManager;
+
+                  View selector;
+                  View botOverlay;
+
+                  Bitmap template;
+
+                  int attackX=650;
+                  int attackY=1350;
+
+                  int moveX=360;
+                  int moveY=1450;
+
+                  int lootX=360;
+                  int lootY=1450;
+
+                  boolean running=false;
+
+                  long lastAttack=0;
+                  long lastMove=0;
+                  long lastLoot=0;
+
+                  int state=0;
+
+                  @Override
+                  public void onCreate() {
+
+                      super.onCreate();
+
+                      instance=this;
+
+                      NotificationManager nm =
+                          (NotificationManager)
+                              getSystemService(
+                                  NOTIFICATION_SERVICE
+                              );
+
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          nm.createNotificationChannel(
+                              new NotificationChannel(
+                                  "bot6",
+                                  "DustinBot Bot",
+                                  NotificationManager.IMPORTANCE_LOW
+                              )
+                          );
+                      }
+
+                      Notification notification;
+
+                      if (Build.VERSION.SDK_INT >= 26) {
+                          notification =
+                              new Notification.Builder(
+                                  this,
+                                  "bot6"
+                              )
+                              .setContentTitle(
+                                  "DustinBot V6"
+                              )
+                              .setContentText(
+                                  "Bot Running"
+                              )
+                              .setSmallIcon(
+                                  android.R.drawable.ic_media_play
+                              )
+                              .build();
+                      } else {
+                          notification =
+                              new Notification.Builder(this)
+                              .setContentTitle(
+                                  "DustinBot V6"
+                              )
+                              .setSmallIcon(
+                                  android.R.drawable.ic_media_play
+                              )
+                              .build();
+                      }
+
+                      startForeground(
+                          6003,
+                          notification
+                      );
+
+                      windowManager =
+                          (WindowManager)
+                              getSystemService(
+                                  WINDOW_SERVICE
+                              );
+
+                      thread =
+                          new HandlerThread(
+                              "DustinBotV6"
+                          );
+
+                      thread.start();
+
+                      handler =
+                          new Handler(
+                              thread.getLooper()
+                          );
+                  }
+
+                  @Override
+                  public int onStartCommand(
+                      Intent intent,
+                      int flags,
+                      int startId
+                  ) {
+
+                      if (
+                          intent != null &&
+                          "STOP".equals(
+                              intent.getAction()
+                          )
+                      ) {
+
+                          running=false;
+
+                          return START_NOT_STICKY;
+                      }
+
+                      if (intent != null) {
+
+                          attackX =
+                              intent.getIntExtra(
+                                  "attackX",
+                                  attackX
+                              );
+
+                          attackY =
+                              intent.getIntExtra(
+                                  "attackY",
+                                  attackY
+                              );
+
+                          moveX =
+                              intent.getIntExtra(
+                                  "moveX",
+                                  moveX
+                              );
+
+                          moveY =
+                              intent.getIntExtra(
+                                  "moveY",
+                                  moveY
+                              );
+
+                          lootX =
+                              intent.getIntExtra(
+                                  "lootX",
+                                  lootX
+                              );
+
+                          lootY =
+                              intent.getIntExtra(
+                                  "lootY",
+                                  lootY
+                              );
+
+                          if (
+                              intent.getBooleanExtra(
+                                  "select",
+                                  false
+                              )
+                          ) {
+
+                              showSelector();
+
+                          } else if (template != null) {
+
+                              startLoop();
+                          }
+                      }
+
+                      return START_STICKY;
+                  }
+
+                  WindowManager.LayoutParams overlayParams(
+                      boolean touch
+                  ) {
+
+                      int flags =
+                          WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
+
+                      if (!touch) {
+                          flags |=
+                              WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE |
+                              WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+                      }
+
+                      return new WindowManager.LayoutParams(
+                          -1,
+                          -1,
+                          Build.VERSION.SDK_INT >= 26
+                              ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                              : WindowManager.LayoutParams.TYPE_PHONE,
+                          flags,
+                          PixelFormat.TRANSLUCENT
+                      );
+                  }
+
+                  void showSelector() {
+
+                      if (selector != null) {
+                          return;
+                      }
+
+                      selector =
+                          new SelectView();
+
+                      try {
+
+                          windowManager.addView(
+                              selector,
+                              overlayParams(true)
+                          );
+
+                      } catch (Exception e) {
+
+                          selector=null;
+                      }
+                  }
+
+                  void chooseMonster(
+                      float x,
+                      float y
+                  ) {
+
+                      if (selector != null) {
+
+                          try {
+                              windowManager.removeView(
+                                  selector
+                              );
+                          } catch (Exception ignored) {}
+
+                          selector=null;
+                      }
+
+                      handler.postDelayed(
+                          () -> saveTemplate(x,y),
+                          300
+                      );
+                  }
+
+                  void saveTemplate(
+                      float x,
+                      float y
+                  ) {
+
+                      Bitmap screen =
+                          CaptureService.copy();
+
+                      if (screen == null) {
+                          return;
+                      }
+
+                      int screenW =
+                          Math.max(
+                              1,
+                              windowManager
+                                  .getDefaultDisplay()
+                                  .getWidth()
+                          );
+
+                      int screenH =
+                          Math.max(
+                              1,
+                              windowManager
+                                  .getDefaultDisplay()
+                                  .getHeight()
+                          );
+
+                      int sx =
+                          (int)(
+                              x *
+                              screen.getWidth() /
+                              (float)screenW
+                          );
+
+                      int sy =
+                          (int)(
+                              y *
+                              screen.getHeight() /
+                              (float)screenH
+                          );
+
+                      int size =
+                          Math.min(
+                              80,
+                              Math.min(
+                                  screen.getWidth(),
+                                  screen.getHeight()
+                              )
+                          );
+
+                      int left =
+                          Math.max(
+                              0,
+                              Math.min(
+                                  screen.getWidth()-size,
+                                  sx-size/2
+                              )
+                          );
+
+                      int top =
+                          Math.max(
+                              0,
+                              Math.min(
+                                  screen.getHeight()-size,
+                                  sy-size/2
+                              )
+                          );
+
+                      if (template != null) {
+                          template.recycle();
+                      }
+
+                      template =
+                          Bitmap.createBitmap(
+                              screen,
+                              left,
+                              top,
+                              size,
+                              size
+                          );
+
+                      screen.recycle();
+
+                      showBotOverlay();
+                      startLoop();
+                  }
+
+                  void showBotOverlay() {
+
+                      if (botOverlay != null) {
+                          return;
+                      }
+
+                      botOverlay =
+                          new BotOverlay();
+
+                      try {
+
+                          windowManager.addView(
+                              botOverlay,
+                              overlayParams(false)
+                          );
+
+                      } catch (Exception e) {
+
+                          botOverlay=null;
+                      }
+                  }
+
+                  void startLoop() {
+
+                      if (template == null) {
+                          return;
+                      }
+
+                      running=true;
+
+                      handler.removeCallbacksAndMessages(
+                          null
+                      );
+
+                      handler.post(loop);
+                  }
+
+                  final Runnable loop = new Runnable() {
+
+                      @Override
+                      public void run() {
+
+                          if (!running) {
+                              return;
+                          }
+
+                          Bitmap screen =
+                              CaptureService.copy();
+
+                          if (
+                              screen != null &&
+                              template != null
+                          ) {
+
+                              Match match =
+                                  findBest(
+                                      screen,
+                                      template
+                                  );
+
+                              long now =
+                                  System.currentTimeMillis();
+
+                              if (
+                                  match.score >= 0.72f
+                              ) {
+
+                                  state=1;
+
+                                  if (
+                                      AccessService.instance != null &&
+                                      now-lastAttack > 650
+                                  ) {
+
+                                      AccessService.instance.tap(
+                                          attackX,
+                                          attackY
+                                      );
+
+                                      lastAttack=now;
+                                      state=2;
+                                  }
+
+                              } else {
+
+                                  state=0;
+
+                                  if (
+                                      AccessService.instance != null &&
+                                      now-lastMove > 1800
+                                  ) {
+
+                                      AccessService.instance.swipe(
+                                          moveX,
+                                          moveY,
+                                          moveX+180,
+                                          moveY,
+                                          450
+                                      );
+
+                                      lastMove=now;
+                                  }
+
+                                  if (
+                                      AccessService.instance != null &&
+                                      now-lastLoot > 1200
+                                  ) {
+
+                                      AccessService.instance.tap(
+                                          lootX,
+                                          lootY
+                                      );
+
+                                      lastLoot=now;
+                                      state=3;
+                                  }
+                              }
+
+                              if (botOverlay != null) {
+                                  ((BotOverlay)botOverlay)
+                                      .update(match,state);
+                              }
+
+                              screen.recycle();
+                          }
+
+                          handler.postDelayed(
+                              this,
+                              450
+                          );
+                      }
+                  };
+
+                  Match findBest(
+                      Bitmap screen,
+                      Bitmap target
+                  ) {
+
+                      int sw=screen.getWidth();
+                      int sh=screen.getHeight();
+
+                      int tw=target.getWidth();
+                      int th=target.getHeight();
+
+                      if (
+                          sw<tw ||
+                          sh<th
+                      ) {
+                          return new Match(
+                              -1,
+                              -1,
+                              0
+                          );
+                      }
+
+                      int[] source =
+                          new int[sw*sh];
+
+                      int[] wanted =
+                          new int[tw*th];
+
+                      screen.getPixels(
+                          source,
+                          0,
+                          sw,
+                          0,
+                          0,
+                          sw,
+                          sh
+                      );
+
+                      target.getPixels(
+                          wanted,
+                          0,
+                          tw,
+                          0,
+                          0,
+                          tw,
+                          th
+                      );
+
+                      long best =
+                          Long.MAX_VALUE;
+
+                      int bestX=-1;
+                      int bestY=-1;
+
+                      for (
+                          int y=0;
+                          y<=sh-th;
+                          y+=18
+                      ) {
+
+                          for (
+                              int x=0;
+                              x<=sw-tw;
+                              x+=18
+                          ) {
+
+                              long difference=0;
+
+                              for (
+                                  int yy=0;
+                                  yy<th;
+                                  yy+=6
+                              ) {
+
+                                  for (
+                                      int xx=0;
+                                      xx<tw;
+                                      xx+=6
+                                  ) {
+
+                                      int a =
+                                          source[
+                                              (y+yy)*sw+x+xx
+                                          ];
+
+                                      int b =
+                                          wanted[
+                                              yy*tw+xx
+                                          ];
+
+                                      difference +=
+                                          Math.abs(
+                                              ((a>>16)&255) -
+                                              ((b>>16)&255)
+                                          );
+
+                                      difference +=
+                                          Math.abs(
+                                              ((a>>8)&255) -
+                                              ((b>>8)&255)
+                                          );
+
+                                      difference +=
+                                          Math.abs(
+                                              (a&255) -
+                                              (b&255)
+                                          );
+                                  }
+                              }
+
+                              if (
+                                  difference<best
+                              ) {
+
+                                  best=difference;
+                                  bestX=x;
+                                  bestY=y;
+                              }
+                          }
+                      }
+
+                      long samples =
+                          ((tw+5)/6L) *
+                          ((th+5)/6L);
+
+                      long max =
+                          samples*765L;
+
+                      float score =
+                          max==0
+                              ? 0
+                              : 1f -
+                                best/(float)max;
+
+                      return new Match(
+                          bestX,
+                          bestY,
+                          score
+                      );
+                  }
+
+                  @Override
+                  public void onDestroy() {
+
+                      running=false;
+
+                      if (handler != null) {
+                          handler.removeCallbacksAndMessages(
+                              null
+                          );
+                      }
+
+                      if (botOverlay != null) {
+
+                          try {
+                              windowManager.removeView(
+                                  botOverlay
+                              );
+                          } catch (Exception ignored) {}
+                      }
+
+                      if (selector != null) {
+
+                          try {
+                              windowManager.removeView(
+                                  selector
+                              );
+                          } catch (Exception ignored) {}
+                      }
+
+                      if (
+                          template != null &&
+                          !template.isRecycled()
+                      ) {
+                          template.recycle();
+                      }
+
+                      if (thread != null) {
+                          thread.quitSafely();
+                      }
+
+                      instance=null;
+
+                      super.onDestroy();
+                  }
+
+                  @Override
+                  public IBinder onBind(Intent intent) {
+                      return null;
+                  }
+
+                  class SelectView extends View {
+
+                      Paint paint =
+                          new Paint(1);
+
+                      SelectView() {
+                          super(BotService.this);
+                          setBackgroundColor(
+                              0x22000000
+                          );
+                      }
+
+                      @Override
+                      protected void onDraw(
+                          Canvas canvas
+                      ) {
+
+                          paint.setColor(
+                              Color.GREEN
+                          );
+
+                          paint.setStyle(
+                              Paint.Style.STROKE
+                          );
+
+                          paint.setStrokeWidth(5);
+
+                          canvas.drawRect(
+                              getWidth()/2f-40,
+                              getHeight()/2f-40,
+                              getWidth()/2f+40,
+                              getHeight()/2f+40,
+                              paint
+                          );
+
+                          paint.setStyle(
+                              Paint.Style.FILL
+                          );
+
+                          paint.setTextSize(28);
+
+                          canvas.drawText(
+                              "แตะ MONSTER 1 ครั้ง",
+                              30,
+                              60,
+                              paint
+                          );
+                      }
+
+                      @Override
+                      public boolean onTouchEvent(
+                          MotionEvent event
+                      ) {
+
+                          if (
+                              event.getAction() ==
+                              MotionEvent.ACTION_UP
+                          ) {
+
+                              chooseMonster(
+                                  event.getX(),
+                                  event.getY()
+                              );
+
+                              return true;
+                          }
+
+                          return true;
+                      }
+                  }
+
+                  class BotOverlay extends View {
+
+                      Paint paint =
+                          new Paint(1);
+
+                      int x=-1;
+                      int y=-1;
+
+                      float score=0;
+
+                      int currentState=0;
+
+                      BotOverlay() {
+                          super(BotService.this);
+                      }
+
+                      void update(
+                          Match m,
+                          int state
+                      ) {
+
+                          x=m.x;
+                          y=m.y;
+                          score=m.score;
+                          currentState=state;
+
+                          postInvalidate();
+                      }
+
+                      @Override
+                      protected void onDraw(
+                          Canvas canvas
+                      ) {
+
+                          if (
+                              x<0 ||
+                              y<0 ||
+                              template==null
+                          ) {
+                              return;
+                          }
+
+                          paint.setColor(
+                              Color.GREEN
+                          );
+
+                          paint.setStyle(
+                              Paint.Style.STROKE
+                          );
+
+                          paint.setStrokeWidth(5);
+
+                          canvas.drawRect(
+                              x,
+                              y,
+                              x+template.getWidth(),
+                              y+template.getHeight(),
+                              paint
+                          );
+
+                          paint.setStyle(
+                              Paint.Style.FILL
+                          );
+
+                          paint.setTextSize(24);
+
+                          String[] names = {
+                              "SEARCH",
+                              "TARGET",
+                              "ATTACK",
+                              "LOOT"
+                          };
+
+                          int index =
+                              Math.max(
+                                  0,
+                                  Math.min(
+                                      3,
+                                      currentState
+                                  )
+                              );
+
+                          canvas.drawText(
+                              String.format(
+                                  Locale.US,
+                                  "BOT %s %.2f",
+                                  names[index],
+                                  score
+                              ),
+                              20,
+                              50,
+                              paint
+                          );
+                      }
+                  }
+
+                  static class Match {
+
+                      int x;
+                      int y;
+                      float score;
+
+                      Match(
+                          int x,
+                          int y,
+                          float score
+                      ) {
+
+                          this.x=x;
+                          this.y=y;
+                          this.score=score;
+                      }
+                  }
+              }
+          }
+          EOF
+
+      - name: Build APK
+        shell: bash
+        run: |
+          set -e
+          gradle wrapper --gradle-version 8.7
+          ./gradlew clean assembleDebug --stacktrace
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          echo "=============================="
+          echo "DUSTINBOT V6 APK READY"
+          echo "=============================="
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DustinBot-V6-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
