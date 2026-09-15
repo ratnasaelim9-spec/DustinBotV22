@@ -1,28 +1,28 @@
 name: Build DustinBot V6 AUTO
-
+ 
 on:
  workflow_dispatch:
  push:
    branches: [ main ]
-
+ 
 jobs:
  build:
    runs-on: ubuntu-latest
    steps:
      - name: Checkout
        uses: actions/checkout@v4
-
+ 
      - name: Setup Java
        uses: actions/setup-java@v4
        with:
          distribution: temurin
          java-version: "17"
-
+ 
      - name: Setup Gradle
        uses: gradle/actions/setup-gradle@v4
        with:
          gradle-version: "8.7"
-
+ 
      - name: Create project
        shell: bash
        run: |
@@ -30,7 +30,7 @@ jobs:
          mkdir -p app/src/main/java/com/dustinbot/v6
          mkdir -p app/src/main/res/values
          mkdir -p app/src/main/res/xml
-
+ 
          cat > settings.gradle <<'EOF'
          pluginManagement {
              repositories {
@@ -49,18 +49,18 @@ jobs:
          rootProject.name = "DustinBotV6"
          include(":app")
          EOF
-
+ 
          cat > build.gradle <<'EOF'
          plugins {
              id "com.android.application" version "8.6.1" apply false
          }
          EOF
-
+ 
          cat > gradle.properties <<'EOF'
          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
          android.useAndroidX=true
          EOF
-
+ 
          cat > app/build.gradle <<'EOF'
          plugins { id "com.android.application" }
          android {
@@ -75,7 +75,7 @@ jobs:
              }
          }
          EOF
-
+ 
          cat > app/src/main/res/values/styles.xml <<'EOF'
          <?xml version="1.0" encoding="utf-8"?>
          <resources>
@@ -87,7 +87,7 @@ jobs:
              </style>
          </resources>
          EOF
-
+ 
          cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
          <?xml version="1.0" encoding="utf-8"?>
          <accessibility-service
@@ -98,7 +98,7 @@ jobs:
              android:canRetrieveWindowContent="false"
              android:canPerformGestures="true" />
          EOF
-
+ 
          cat > app/src/main/AndroidManifest.xml <<'EOF'
          <?xml version="1.0" encoding="utf-8"?>
          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -138,11 +138,11 @@ jobs:
              </application>
          </manifest>
          EOF
-
+ 
          cat > app/src/main/java/com/dustinbot/v6/MainActivity.java <<'EOF'
-
+ 
          package com.dustinbot.v6;
-
+ 
          import android.accessibilityservice.AccessibilityService;
          import android.accessibilityservice.GestureDescription;
          import android.app.*;
@@ -157,12 +157,12 @@ jobs:
          import android.widget.*;
          import java.nio.ByteBuffer;
          import java.util.Locale;
-
+ 
          public class MainActivity extends Activity {
              static final int CAPTURE=6001;
              EditText attackX,attackY,moveX,moveY,lootX,lootY;
              TextView status;
-
+ 
              int dp(int n){return (int)(n*getResources().getDisplayMetrics().density+.5f);}
              Button btn(String s,View.OnClickListener l){
                  Button b=new Button(this); b.setText(s); b.setOnClickListener(l); return b;
@@ -172,23 +172,23 @@ jobs:
                  e.setInputType(2); return e;
              }
              int num(EditText e,int d){try{return Integer.parseInt(e.getText().toString());}catch(Exception x){return d;}}
-
+ 
              @Override public void onCreate(Bundle b){
                  super.onCreate(b);
                  LinearLayout root=new LinearLayout(this);
                  root.setOrientation(LinearLayout.VERTICAL);
                  root.setPadding(dp(12),dp(8),dp(12),dp(20));
-
+ 
                  TextView title=new TextView(this);
                  title.setText("DUSTIN BOT V6");
                  title.setTextSize(28);
                  root.addView(title);
-
+ 
                  status=new TextView(this);
                  status.setText("สถานะ: STOP");
                  status.setTextSize(16);
                  root.addView(status);
-
+ 
                  root.addView(btn("1. เปิด Accessibility",v->
                      startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))));
                  root.addView(btn("2. เปิด Overlay",v->
@@ -196,7 +196,7 @@ jobs:
                          Uri.parse("package:"+getPackageName())))));
                  root.addView(btn("3. SCREEN CAPTURE",v->capture()));
                  root.addView(btn("4. AUTO FIND MONSTER",v->startBot(false)));
-
+ 
                  root.addView(new TextView(this){{setText("ตำแหน่งปุ่มโจมตี / เดิน / เก็บของ (พิกัดหน้าจอ)");setTextSize(15);}});
                  attackX=field("Attack X","650"); attackY=field("Attack Y","1350");
                  moveX=field("Move X","360"); moveY=field("Move Y","1450");
@@ -204,22 +204,22 @@ jobs:
                  root.addView(attackX);root.addView(attackY);
                  root.addView(moveX);root.addView(moveY);
                  root.addView(lootX);root.addView(lootY);
-
+ 
                  root.addView(btn("5. START BOT",v->startBot(false)));
                  root.addView(btn("6. STOP BOT",v->stopBot()));
                  root.addView(new TextView(this){{
                      setText("การทำงาน: SEARCH → TARGET → ATTACK → CHECK LOOT → LOOT → SEARCH");
                      setTextSize(14); setPadding(0,dp(12),0,0);
                  }});
-
+ 
                  ScrollView sc=new ScrollView(this); sc.addView(root); setContentView(sc);
              }
-
+ 
              void capture(){
                  MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
                  startActivityForResult(m.createScreenCaptureIntent(),CAPTURE);
              }
-
+ 
              void startBot(boolean select){
                  Intent i=new Intent(this,BotService.class);
                  i.putExtra("attackX",num(attackX,650));
@@ -231,12 +231,12 @@ jobs:
                  if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
                  status.setText("สถานะ: AUTO BOT RUNNING");
              }
-
+ 
              void stopBot(){
                  Intent i=new Intent(this,BotService.class); i.setAction("STOP");
                  startService(i); status.setText("สถานะ: STOP");
              }
-
+ 
              @Override protected void onActivityResult(int r,int c,Intent d){
                  super.onActivityResult(r,c,d);
                  if(r!=CAPTURE||c!=RESULT_OK||d==null)return;
@@ -244,7 +244,7 @@ jobs:
                  i.putExtra("resultCode",c);i.putExtra("data",d);
                  if(Build.VERSION.SDK_INT>=26)startForegroundService(i);else startService(i);
              }
-
+ 
              public static class AccessService extends AccessibilityService{
                  static volatile AccessService instance;
                  @Override public void onServiceConnected(){instance=this;}
@@ -264,14 +264,14 @@ jobs:
                  @Override public void onInterrupt(){}
                  @Override public void onDestroy(){instance=null;super.onDestroy();}
              }
-
+ 
              public static class CaptureService extends Service{
                  static volatile Bitmap latest;
                  static volatile int W=1,H=1;
                  MediaProjection projection; ImageReader reader;
                  android.hardware.display.VirtualDisplay display;
                  HandlerThread worker; Handler handler;
-
+ 
                  @Override public void onCreate(){
                      super.onCreate();
                      NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
@@ -281,7 +281,7 @@ jobs:
                          .setSmallIcon(android.R.drawable.ic_menu_camera).build());
                      worker=new HandlerThread("Capture6");worker.start();handler=new Handler(worker.getLooper());
                  }
-
+ 
                  @Override public int onStartCommand(Intent i,int f,int id){
                      if(i==null)return START_STICKY;
                      int rc=i.getIntExtra("resultCode",0);
@@ -289,7 +289,7 @@ jobs:
                      if(d!=null)startCapture(rc,d);
                      return START_STICKY;
                  }
-
+ 
                  void startCapture(int rc,Intent data){
                      try{
                          MediaProjectionManager m=(MediaProjectionManager)getSystemService(MEDIA_PROJECTION_SERVICE);
@@ -303,7 +303,7 @@ jobs:
                              reader.getSurface(),null,handler);
                      }catch(Exception e){e.printStackTrace();}
                  }
-
+ 
                  void frame(ImageReader r){
                      Image im=null;
                      try{
@@ -319,13 +319,13 @@ jobs:
                      }catch(Exception e){e.printStackTrace();}
                      finally{if(im!=null)im.close();}
                  }
-
+ 
                  static Bitmap copy(){
                      Bitmap b=latest;
                      if(b==null||b.isRecycled())return null;
                      try{return b.copy(Bitmap.Config.ARGB_8888,false);}catch(Exception e){return null;}
                  }
-
+ 
                  @Override public void onDestroy(){
                      if(display!=null)display.release();if(reader!=null)reader.close();
                      if(projection!=null)projection.stop();if(worker!=null)worker.quitSafely();
@@ -334,25 +334,25 @@ jobs:
                  }
                  @Override public IBinder onBind(Intent i){return null;}
              }
-
+ 
                            public static class BotService extends Service{
                  static volatile BotService instance;
                  HandlerThread worker;
                  Handler h;
                  WindowManager wm;
                  BotView overlay;
-
+ 
                  int ax=650,ay=1350,mx=360,my=1450,lx=360,ly=1450;
                  boolean running=false;
                  long lastAttack=0,lastLoot=0,lastMove=0,lastScan=0;
                  int state=0;
                  int targetX=-1,targetY=-1;
                  int scanIndex=0;
-
+ 
                  @Override public void onCreate(){
                      super.onCreate();
                      instance=this;
-
+ 
                      NotificationManager nm=(NotificationManager)getSystemService(NOTIFICATION_SERVICE);
                      if(Build.VERSION.SDK_INT>=26){
                          nm.createNotificationChannel(
@@ -362,7 +362,7 @@ jobs:
                              )
                          );
                      }
-
+ 
                      Notification notification;
                      if(Build.VERSION.SDK_INT>=26){
                          notification=new Notification.Builder(this,"bot6")
@@ -377,20 +377,20 @@ jobs:
                              .build();
                      }
                      startForeground(6003,notification);
-
+ 
                      wm=(WindowManager)getSystemService(WINDOW_SERVICE);
                      worker=new HandlerThread("Bot6");
                      worker.start();
                      h=new Handler(worker.getLooper());
                  }
-
+ 
                  @Override public int onStartCommand(Intent i,int f,int id){
                      if(i!=null&&"STOP".equals(i.getAction())){
                          stopBot();
                          stopSelf();
                          return START_NOT_STICKY;
                      }
-
+ 
                      if(i!=null){
                          ax=i.getIntExtra("attackX",ax);
                          ay=i.getIntExtra("attackY",ay);
@@ -399,16 +399,16 @@ jobs:
                          lx=i.getIntExtra("lootX",lx);
                          ly=i.getIntExtra("lootY",ly);
                      }
-
+ 
                      startBotLoop();
                      return START_STICKY;
                  }
-
+ 
                  WindowManager.LayoutParams lp(){
                      int flags=WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE|
                          WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE|
                          WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS;
-
+ 
                      return new WindowManager.LayoutParams(
                          -1,-1,
                          Build.VERSION.SDK_INT>=26
@@ -418,7 +418,7 @@ jobs:
                          PixelFormat.TRANSLUCENT
                      );
                  }
-
+ 
                  void showOverlay(){
                      if(overlay!=null)return;
                      overlay=new BotView();
@@ -428,7 +428,7 @@ jobs:
                          overlay=null;
                      }
                  }
-
+ 
                  void startBotLoop(){
                      running=true;
                      showOverlay();
@@ -438,32 +438,32 @@ jobs:
                      targetY=-1;
                      h.post(loop);
                  }
-
+ 
                  void stopBot(){
                      running=false;
                      if(h!=null)h.removeCallbacksAndMessages(null);
                      state=0;
                      if(overlay!=null)overlay.invalidate();
                  }
-
+ 
                  final Runnable loop=()->{
                      if(!running)return;
-
+ 
                      Bitmap s=CaptureService.copy();
                      if(s!=null){
                          long now=System.currentTimeMillis();
-
+ 
                          if(targetX>=0&&targetY>=0){
                              state=1;
-
+ 
                              if(AccessService.instance!=null &&
                                  now-lastAttack>700){
-
+ 
                                  AccessService.instance.tap(ax,ay);
                                  lastAttack=now;
                                  state=2;
                              }
-
+ 
                              /*
                               * Keep attacking for a short cycle.
                               * Then collect and search again.
@@ -480,14 +480,14 @@ jobs:
                              }
                          }else{
                              state=0;
-
+ 
                              Candidate c=findMonsterCandidate(s);
-
+ 
                              if(c!=null){
                                  targetX=c.x;
                                  targetY=c.y;
                                  state=1;
-
+ 
                                  if(AccessService.instance!=null){
                                      AccessService.instance.tap(
                                          c.x,c.y
@@ -499,7 +499,7 @@ jobs:
                                      AccessService.instance.tap(lx,ly);
                                      lastLoot=now;
                                  }
-
+ 
                                  if(AccessService.instance!=null &&
                                      now-lastMove>2200){
                                      state=4;
@@ -512,7 +512,7 @@ jobs:
                                  }
                              }
                          }
-
+ 
                          if(overlay!=null){
                              overlay.set(
                                  targetX,
@@ -520,13 +520,13 @@ jobs:
                                  state
                              );
                          }
-
+ 
                          s.recycle();
                      }
-
+ 
                      h.postDelayed(loop,350);
                  };
-
+ 
                  /*
                   * Generic visual candidate detector.
                   *
@@ -538,28 +538,28 @@ jobs:
                  Candidate findMonsterCandidate(Bitmap s){
                      int w=s.getWidth();
                      int hgt=s.getHeight();
-
+ 
                      int left=(int)(w*0.12f);
                      int right=(int)(w*0.82f);
                      int top=(int)(hgt*0.16f);
                      int bottom=(int)(hgt*0.78f);
-
+ 
                      int step=8;
                      int gw=Math.max(1,(right-left)/step);
                      int gh=Math.max(1,(bottom-top)/step);
-
+ 
                      boolean[][] active=new boolean[gh][gw];
-
+ 
                      int[] px=new int[w*hgt];
                      s.getPixels(px,0,w,0,0,w,hgt);
-
+ 
                      for(int gy=0;gy<gh;gy++){
                          int y=top+gy*step;
                          for(int gx=0;gx<gw;gx++){
                              int x=left+gx*step;
                              int count=0;
                              int samples=0;
-
+ 
                              for(int yy=0;yy<step;yy+=2){
                                  int sy=Math.min(hgt-1,y+yy);
                                  for(int xx=0;xx<step;xx+=2){
@@ -568,62 +568,62 @@ jobs:
                                      int r=(p>>16)&255;
                                      int g=(p>>8)&255;
                                      int b=p&255;
-
+ 
                                      int max=Math.max(r,Math.max(g,b));
                                      int min=Math.min(r,Math.min(g,b));
-
+ 
                                      if(max-min>75 && max>90){
                                          count++;
                                      }
                                      samples++;
                                  }
                              }
-
+ 
                              active[gy][gx]=
                                  count>=Math.max(2,samples/3);
                          }
                      }
-
+ 
                      boolean[][] seen=new boolean[gh][gw];
                      Candidate best=null;
-
+ 
                      int[] qx=new int[gw*gh];
                      int[] qy=new int[gw*gh];
-
+ 
                      for(int sy=0;sy<gh;sy++){
                          for(int sx=0;sx<gw;sx++){
                              if(!active[sy][sx]||seen[sy][sx])continue;
-
+ 
                              int head=0,tail=0;
                              qx[tail]=sx;
                              qy[tail]=sy;
                              tail++;
                              seen[sy][sx]=true;
-
+ 
                              int minX=sx,maxX=sx,minY=sy,maxY=sy;
                              int count=0;
-
+ 
                              while(head<tail){
                                  int cx=qx[head];
                                  int cy=qy[head];
                                  head++;
                                  count++;
-
+ 
                                  minX=Math.min(minX,cx);
                                  maxX=Math.max(maxX,cx);
                                  minY=Math.min(minY,cy);
                                  maxY=Math.max(maxY,cy);
-
+ 
                                  for(int dy=-1;dy<=1;dy++){
                                      for(int dx=-1;dx<=1;dx++){
                                          int nx=cx+dx;
                                          int ny=cy+dy;
-
+ 
                                          if(nx<0||ny<0||
                                             nx>=gw||ny>=gh||
                                             seen[ny][nx]||
                                             !active[ny][nx])continue;
-
+ 
                                          seen[ny][nx]=true;
                                          qx[tail]=nx;
                                          qy[tail]=ny;
@@ -631,30 +631,30 @@ jobs:
                                      }
                                  }
                              }
-
+ 
                              int bw=(maxX-minX+1)*step;
                              int bh=(maxY-minY+1)*step;
-
+ 
                              if(count<3||count>220)continue;
                              if(bw<12||bh<12||bw>180||bh>180)continue;
-
+ 
                              int cx=left+((minX+maxX)*step)/2;
                              int cy=top+((minY+maxY)*step)/2;
-
+ 
                              /*
                               * Reject the usual player/UI zones.
                               */
                              if(cx<w*0.25f && cy<hgt*0.35f)continue;
                              if(cx>w*0.78f)continue;
                              if(cy>hgt*0.70f)continue;
-
+ 
                              float centerX=w*0.50f;
                              float centerY=hgt*0.50f;
                              float dist=(float)Math.hypot(
                                  cx-centerX,
                                  cy-centerY
                              );
-
+ 
                              float compact=
                                  Math.min(
                                      1f,
@@ -664,10 +664,10 @@ jobs:
                                          (bw/step)*(bh/step)
                                      )
                                  );
-
+ 
                              float score=
                                  compact*700f-dist;
-
+ 
                              if(best==null||score>best.score){
                                  best=new Candidate(
                                      cx,cy,bw,bh,score
@@ -675,33 +675,33 @@ jobs:
                              }
                          }
                      }
-
+ 
                      return best;
                  }
-
+ 
                  @Override public void onDestroy(){
                      stopBot();
-
+ 
                      if(overlay!=null){
                          try{
                              wm.removeView(overlay);
                          }catch(Exception ignored){}
                          overlay=null;
                      }
-
+ 
                      if(worker!=null)worker.quitSafely();
                      instance=null;
                      super.onDestroy();
                  }
-
+ 
                  @Override public IBinder onBind(Intent i){
                      return null;
                  }
-
+ 
                  static class Candidate{
                      int x,y,w,h;
                      float score;
-
+ 
                      Candidate(
                          int x,
                          int y,
@@ -716,41 +716,41 @@ jobs:
                          this.score=score;
                      }
                  }
-
+ 
                  class BotView extends View{
                      Paint p=new Paint(1);
                      int x=-1,y=-1,state=0;
-
+ 
                      BotView(){
                          super(BotService.this);
                      }
-
+ 
                      void set(int x,int y,int state){
                          this.x=x;
                          this.y=y;
                          this.state=state;
                          postInvalidate();
                      }
-
+ 
                      @Override protected void onDraw(Canvas c){
                          p.setStyle(Paint.Style.FILL);
                          p.setTextSize(24);
                          p.setColor(Color.GREEN);
-
+ 
                          String name;
                          if(state==1)name="TARGET";
                          else if(state==2)name="ATTACK";
                          else if(state==3)name="LOOT";
                          else if(state==4)name="MOVE";
                          else name="SEARCH";
-
+ 
                          c.drawText(
                              "DUSTINBOT V6  "+name,
                              20,
                              45,
                              p
                          );
-
+ 
                          if(x>=0&&y>=0){
                              p.setStyle(Paint.Style.STROKE);
                              p.setStrokeWidth(5);
@@ -760,18 +760,17 @@ jobs:
                      }
                  }
              }
-
-             }
+ 
          }
          EOF
-
+ 
      - name: Build APK
        shell: bash
        run: |
          set -e
          gradle wrapper --gradle-version 8.7
          ./gradlew clean assembleDebug --stacktrace
-
+ 
      - name: Verify APK
        shell: bash
        run: |
@@ -779,7 +778,7 @@ jobs:
          test -f app/build/outputs/apk/debug/app-debug.apk
          echo "DUSTINBOT V6 AUTO APK READY"
          ls -lh app/build/outputs/apk/debug/app-debug.apk
-
+ 
      - name: Upload APK
        uses: actions/upload-artifact@v4
        with:
