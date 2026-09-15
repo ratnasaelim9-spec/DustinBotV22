@@ -1,4 +1,4 @@
-name: Build DustinBot V6 AUTO FINAL
+name: Build DustinBot V6 AUTO FINAL 2
  
 on:
  workflow_dispatch:
@@ -526,6 +526,7 @@ jobs:
                      }
  
                      h.postDelayed(this,350);
+                     }
                  };
  
                  /*
