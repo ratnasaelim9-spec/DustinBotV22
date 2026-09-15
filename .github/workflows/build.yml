@@ -1,4 +1,4 @@
-name: Build DustinBot V6 AUTO FIXED 3
+name: Build DustinBot V6 AUTO FINAL
  
 on:
  workflow_dispatch:
@@ -436,7 +436,7 @@ jobs:
                      state=0;
                      targetX=-1;
                      targetY=-1;
-                     h.post(loop[0]);
+                     h.post(loop);
                  }
  
                  void stopBot(){
@@ -446,8 +446,8 @@ jobs:
                      if(overlay!=null)overlay.invalidate();
                  }
  
-                 final Runnable[] loop=new Runnable[1];
-                 loop[0]=()->{
+                 final Runnable loop=new Runnable(){
+                     @Override public void run(){
                      if(!running)return;
  
                      Bitmap s=CaptureService.copy();
@@ -525,7 +525,7 @@ jobs:
                          s.recycle();
                      }
  
-                     h.postDelayed(loop[0],350);
+                     h.postDelayed(this,350);
                  };
  
                  /*
