@@ -1,1360 +1,1570 @@
-name: Build DustinBot V7
+name: DUSTIN BOT V9.2 RANDOM LOOT
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-
   build:
-
     runs-on: ubuntu-latest
 
     steps:
 
-      # =========================================================
-      # CHECKOUT
-      # =========================================================
-
       - name: Checkout
-
         uses: actions/checkout@v4
 
-
-      # =========================================================
-      # JAVA
-      # =========================================================
-
-      - name: Setup Java
-
+      - name: Setup JDK
         uses: actions/setup-java@v4
-
         with:
           distribution: temurin
           java-version: '17'
 
-
-      # =========================================================
-      # CREATE PROJECT
-      # =========================================================
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Create Android Project
-
         shell: bash
-
         run: |
 
-          rm -rf app
-          rm -f build.gradle
-          rm -f settings.gradle
-          rm -f gradle.properties
+          set -e
 
-          mkdir -p app/src/main/java/com/dustinbot/v7
+          rm -rf app
+          mkdir -p app/src/main/java/com/dustinbot/v92
           mkdir -p app/src/main/res/values
           mkdir -p app/src/main/res/xml
 
-
-          # =====================================================
-          # settings.gradle
-          # =====================================================
-
           cat > settings.gradle <<'EOF'
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
 
-          pluginManagement {
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
 
-              repositories {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
 
-                  google()
-
-                  mavenCentral()
-
-                  gradlePluginPortal()
-
-              }
-
-          }
-
-
-          dependencyResolutionManagement {
-
-              repositoriesMode.set(
-                  RepositoriesMode.FAIL_ON_PROJECT_REPOS
-              )
-
-              repositories {
-
-                  google()
-
-                  mavenCentral()
-
-              }
-
-          }
-
-
-          rootProject.name =
-              "DustinBotV7"
-
-
-          include(":app")
-
-          EOF
-
-
-          # =====================================================
-          # build.gradle
-          # =====================================================
+rootProject.name = "DustinBotV92"
+include(":app")
+EOF
 
           cat > build.gradle <<'EOF'
-
-          plugins {
-
-              id 'com.android.application'
-                  version '8.6.1'
-                  apply false
-
-          }
-
-          EOF
-
-
-          # =====================================================
-          # gradle.properties
-          # =====================================================
+plugins {
+    id 'com.android.application' version '8.6.1' apply false
+}
+EOF
 
           cat > gradle.properties <<'EOF'
-
-          org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
-
-          android.useAndroidX=true
-
-          EOF
-
-
-          # =====================================================
-          # APP BUILD
-          # =====================================================
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=false
+android.nonTransitiveRClass=true
+EOF
 
           cat > app/build.gradle <<'EOF'
+plugins {
+    id 'com.android.application'
+}
 
-          plugins {
+android {
+    namespace 'com.dustinbot.v92'
+    compileSdk 35
 
-              id 'com.android.application'
+    defaultConfig {
+        applicationId 'com.dustinbot.v92'
+        minSdk 30
+        targetSdk 35
+        versionCode 92
+        versionName '9.2'
+    }
 
-          }
-
-
-          android {
-
-              namespace 'com.dustinbot.v7'
-
-              compileSdk 35
-
-
-              defaultConfig {
-
-                  applicationId 'com.dustinbot.v7'
-
-                  minSdk 26
-
-                  targetSdk 35
-
-                  versionCode 70
-
-                  versionName '7.0'
-
-              }
-
-          }
-
-          EOF
-
-
-          # =====================================================
-          # STRINGS
-          # =====================================================
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+EOF
 
           cat > app/src/main/res/values/strings.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
 
-          <resources>
+    <string name="app_name">DUSTIN BOT V9.2</string>
 
-              <string name="app_name">
-                  DustinBot V7
-              </string>
+    <string name="accessibility_description">
+        DUSTIN BOT uses Android Accessibility to control the visible game interface.
+    </string>
 
-              <string name="accessibility_description">
-                  DustinBot V7
-              </string>
+</resources>
+EOF
 
-          </resources>
+          cat > app/src/main/res/values/styles.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
 
-          EOF
+    <style name="AppTheme"
+        parent="@android:style/Theme.Material.Light.NoActionBar">
 
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:colorAccent">#2196F3</item>
 
-          # =====================================================
-          # THEME
-          # =====================================================
+    </style>
 
-          cat > app/src/main/res/values/themes.xml <<'EOF'
-
-          <resources>
-
-              <style
-                  name="AppTheme"
-                  parent="android:style/Theme.Material.Light.NoActionBar">
-
-                  <item name="android:fontFamily">
-                      sans
-                  </item>
-
-                  <item name="android:colorAccent">
-                      #1976D2
-                  </item>
-
-              </style>
-
-          </resources>
-
-          EOF
-
-
-          # =====================================================
-          # ACCESSIBILITY CONFIG
-          # =====================================================
+</resources>
+EOF
 
           cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
-
-          <?xml version="1.0" encoding="utf-8"?>
-
-          <accessibility-service
-
-              xmlns:android="http://schemas.android.com/apk/res/android"
-
-              android:description="@string/accessibility_description"
-
-              android:accessibilityEventTypes="typeAllMask"
-
-              android:accessibilityFeedbackType="feedbackGeneric"
-
-              android:notificationTimeout="100"
-
-              android:canRetrieveWindowContent="true"
-
-              android:canPerformGestures="true"
-
-              />
-
-          EOF
-
-
-          # =====================================================
-          # MANIFEST
-          # =====================================================
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:notificationTimeout="100"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
+    android:description="@string/accessibility_description"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows" />
+EOF
 
           cat > app/src/main/AndroidManifest.xml <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
 
-          <?xml version="1.0" encoding="utf-8"?>
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+
+            <intent-filter>
+
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+
+            </intent-filter>
+
+        </activity>
+
+        <service
+            android:name=".BotAccessibility"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+
+            <intent-filter>
+
+                <action
+                    android:name="android.accessibilityservice.AccessibilityService" />
+
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+
+        </service>
+
+    </application>
+
+</manifest>
+EOF
+
+          cat > app/src/main/java/com/dustinbot/v92/MainActivity.java <<'EOF'
+package com.dustinbot.v92;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.graphics.Color;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+public class MainActivity extends Activity {
+
+    private int dp(float value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setGravity(Gravity.CENTER);
+        root.setPadding(dp(24), dp(24), dp(24), dp(24));
+        root.setBackgroundColor(Color.rgb(20, 20, 24));
+
+        TextView title = new TextView(this);
+        title.setText("DUSTIN BOT V9.2");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(26);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 0, 0, dp(18));
+
+        TextView info = new TextView(this);
+        info.setText(
+            "RANDOM ROAM + AUTO TARGET + ATTACK + LOOT\n\n" +
+            "1. เปิด Dustin RO ก่อน\n" +
+            "2. เปิด Accessibility ของ DUSTIN BOT\n" +
+            "3. กลับเข้าเกม\n" +
+            "4. กด START บนแผงบอท"
+        );
+        info.setTextColor(Color.LTGRAY);
+        info.setTextSize(16);
+        info.setGravity(Gravity.CENTER);
+        info.setPadding(0, 0, 0, dp(24));
+
+        Button accessibility = new Button(this);
+        accessibility.setText("เปิด Accessibility");
+
+        accessibility.setOnClickListener(v -> {
+            Intent intent =
+                new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS);
+
+            startActivity(intent);
+        });
+
+        root.addView(
+            title,
+            new LinearLayout.LayoutParams(
+                -1,
+                -2
+            )
+        );
+
+        root.addView(
+            info,
+            new LinearLayout.LayoutParams(
+                -1,
+                -2
+            )
+        );
+
+        root.addView(
+            accessibility,
+            new LinearLayout.LayoutParams(
+                -1,
+                dp(56)
+            )
+        );
+
+        setContentView(root);
+    }
+}
+EOF
+
+          cat > app/src/main/java/com/dustinbot/v92/BotAccessibility.java <<'EOF'
+package com.dustinbot.v92;
+
+import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Bitmap;
+import android.graphics.Path;
+import android.graphics.ColorSpace;
+import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.view.Display;
+import android.view.Gravity;
+import android.view.WindowManager;
+import android.graphics.PixelFormat;
+import android.view.View;
+import android.widget.Button;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
-          <manifest
-              xmlns:android="http://schemas.android.com/apk/res/android">
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
+public class BotAccessibility extends AccessibilityService {
 
-              <application
+    private static BotAccessibility instance;
 
-                  android:allowBackup="false"
+    private final Handler handler =
+        new Handler(Looper.getMainLooper());
 
-                  android:label="@string/app_name"
+    private final ExecutorService screenshotExecutor =
+        Executors.newSingleThreadExecutor();
 
-                  android:supportsRtl="true"
+    private WindowManager windowManager;
 
-                  android:theme="@style/AppTheme">
+    private LinearLayout panel;
 
+    private TextView status;
 
-                  <activity
+    private BotEngine engine;
 
-                      android:name=".MainActivity"
+    public static BotAccessibility getInstance() {
+        return instance;
+    }
 
-                      android:exported="true">
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
 
+        instance = this;
 
-                      <intent-filter>
+        windowManager =
+            (WindowManager) getSystemService(WINDOW_SERVICE);
 
-                          <action
-                              android:name="android.intent.action.MAIN"/>
+        engine = new BotEngine(this);
 
-                          <category
-                              android:name="android.intent.category.LAUNCHER"/>
+        createPanel();
+    }
 
-                      </intent-filter>
+    private int dp(float value) {
+        return (int) (
+            value *
+            getResources().getDisplayMetrics().density +
+            0.5f
+        );
+    }
 
+    private void createPanel() {
 
-                  </activity>
+        if (panel != null) {
+            return;
+        }
 
+        panel = new LinearLayout(this);
 
-                  <service
+        panel.setOrientation(
+            LinearLayout.VERTICAL
+        );
 
-                      android:name=".BotAccessibilityService"
+        panel.setPadding(
+            dp(10),
+            dp(8),
+            dp(10),
+            dp(8)
+        );
+
+        panel.setGravity(
+            Gravity.CENTER
+        );
+
+        panel.setBackgroundColor(
+            0xEE111111
+        );
+
+        status = new TextView(this);
+
+        status.setText(
+            "DUSTIN BOT V9.2\nSTOP"
+        );
+
+        status.setTextColor(
+            0xFFFFFFFF
+        );
+
+        status.setTextSize(12);
+
+        status.setGravity(
+            Gravity.CENTER
+        );
+
+        Button start = new Button(this);
+
+        start.setText("START");
+
+        start.setOnClickListener(v -> {
+
+            if (engine != null) {
+                engine.start();
+                updateStatus(true);
+            }
+
+        });
+
+        Button stop = new Button(this);
+
+        stop.setText("STOP");
+
+        stop.setOnClickListener(v -> {
+
+            if (engine != null) {
+                engine.stop();
+                updateStatus(false);
+            }
+
+        });
+
+        Button hide = new Button(this);
+
+        hide.setText("HIDE");
+
+        hide.setOnClickListener(v -> {
+
+            if (panel != null) {
+                panel.setVisibility(View.GONE);
+            }
+
+        });
+
+        panel.addView(
+            status,
+            new LinearLayout.LayoutParams(
+                dp(150),
+                dp(42)
+            )
+        );
+
+        panel.addView(
+            start,
+            new LinearLayout.LayoutParams(
+                dp(150),
+                dp(48)
+            )
+        );
+
+        panel.addView(
+            stop,
+            new LinearLayout.LayoutParams(
+                dp(150),
+                dp(48)
+            )
+        );
+
+        panel.addView(
+            hide,
+            new LinearLayout.LayoutParams(
+                dp(150),
+                dp(42)
+            )
+        );
+
+        WindowManager.LayoutParams params =
+            new WindowManager.LayoutParams(
+                dp(160),
+                dp(220),
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE |
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                PixelFormat.TRANSLUCENT
+            );
+
+        params.gravity =
+            Gravity.TOP |
+            Gravity.END;
+
+        params.x = dp(8);
+        params.y = dp(70);
+
+        windowManager.addView(
+            panel,
+            params
+        );
+    }
+
+    private void updateStatus(boolean running) {
+
+        if (status == null) {
+            return;
+        }
+
+        status.setText(
+            running
+                ? "DUSTIN BOT V9.2\nAI กำลังทำงาน"
+                : "DUSTIN BOT V9.2\nSTOP"
+        );
+    }
+
+    public void later(
+        Runnable runnable,
+        long delay
+    ) {
+
+        if (runnable == null) {
+            return;
+        }
+
+        handler.postDelayed(
+            runnable,
+            delay
+        );
+    }
+
+    public void tap(
+        float x,
+        float y
+    ) {
+
+        Path path = new Path();
+
+        path.moveTo(x, y);
+
+        GestureDescription.StrokeDescription stroke =
+            new GestureDescription.StrokeDescription(
+                path,
+                0,
+                60
+            );
+
+        GestureDescription gesture =
+            new GestureDescription.Builder()
+                .addStroke(stroke)
+                .build();
+
+        dispatchGesture(
+            gesture,
+            null,
+            null
+        );
+    }
+
+    public void swipe(
+        float x1,
+        float y1,
+        float x2,
+        float y2,
+        long duration
+    ) {
+
+        Path path = new Path();
+
+        path.moveTo(x1, y1);
+
+        path.lineTo(x2, y2);
+
+        GestureDescription.StrokeDescription stroke =
+            new GestureDescription.StrokeDescription(
+                path,
+                0,
+                duration
+            );
+
+        GestureDescription gesture =
+            new GestureDescription.Builder()
+                .addStroke(stroke)
+                .build();
+
+        dispatchGesture(
+            gesture,
+            null,
+            null
+        );
+    }
+
+    public void screenshot(
+        ScreenshotCallback callback
+    ) {
+
+        if (Build.VERSION.SDK_INT < 30) {
+            callback.onFailure();
+            return;
+        }
+
+        takeScreenshot(
+            Display.DEFAULT_DISPLAY,
+            screenshotExecutor,
+            new TakeScreenshotCallback() {
+
+                @Override
+                public void onSuccess(
+                    ScreenshotResult result
+                ) {
+
+                    try {
 
-                      android:permission=
-                      "android.permission.BIND_ACCESSIBILITY_SERVICE"
+                        android.hardware.HardwareBuffer buffer =
+                            result.getHardwareBuffer();
+
+                        if (buffer == null) {
+                            callback.onFailure();
+                            return;
+                        }
 
-                      android:exported="false">
+                        Bitmap hardwareBitmap =
+                            Bitmap.wrapHardwareBuffer(
+                                buffer,
+                                ColorSpace.get(
+                                    ColorSpace.Named.SRGB
+                                )
+                            );
 
+                        buffer.close();
 
-                      <intent-filter>
+                        if (hardwareBitmap == null) {
+                            callback.onFailure();
+                            return;
+                        }
 
-                          <action
-                              android:name=
-                              "android.accessibilityservice.AccessibilityService"/>
+                        Bitmap bitmap =
+                            hardwareBitmap.copy(
+                                Bitmap.Config.ARGB_8888,
+                                false
+                            );
 
-                      </intent-filter>
+                        hardwareBitmap.recycle();
 
+                        callback.onSuccess(bitmap);
 
-                      <meta-data
+                    } catch (Throwable e) {
 
-                          android:name=
-                          "android.accessibilityservice"
+                        callback.onFailure();
 
-                          android:resource=
-                          "@xml/accessibility_service_config"/>
+                    }
+                }
 
+                @Override
+                public void onFailure(
+                    int errorCode
+                ) {
 
-                  </service>
+                    callback.onFailure();
 
+                }
+            }
+        );
+    }
 
-              </application>
+    public interface ScreenshotCallback {
 
+        void onSuccess(Bitmap bitmap);
 
-          </manifest>
+        void onFailure();
 
-          EOF
+    }
 
+    @Override
+    public void onAccessibilityEvent(
+        android.view.accessibility.AccessibilityEvent event
+    ) {
+    }
 
-          # =====================================================
-          # MAIN ACTIVITY
-          # =====================================================
+    @Override
+    public void onInterrupt() {
+    }
 
-          cat > app/src/main/java/com/dustinbot/v7/MainActivity.java <<'EOF'
+    @Override
+    public void onDestroy() {
 
-          package com.dustinbot.v7;
+        if (engine != null) {
+            engine.stop();
+        }
 
+        if (panel != null &&
+            windowManager != null) {
 
-          import android.app.Activity;
+            try {
+                windowManager.removeView(panel);
+            } catch (Throwable ignored) {
+            }
 
-          import android.content.Intent;
+        }
 
-          import android.graphics.Color;
+        screenshotExecutor.shutdownNow();
 
-          import android.os.Bundle;
+        instance = null;
 
-          import android.provider.Settings;
+        super.onDestroy();
+    }
+}
+EOF
 
-          import android.view.Gravity;
+          cat > app/src/main/java/com/dustinbot/v92/BotEngine.java <<'EOF'
+package com.dustinbot.v92;
 
-          import android.widget.Button;
+import android.graphics.Bitmap;
+import android.graphics.Color;
+import android.os.Handler;
+import android.os.Looper;
 
-          import android.widget.LinearLayout;
+import java.util.Random;
 
-          import android.widget.TextView;
+public class BotEngine {
 
+    private final BotAccessibility service;
 
-          public class MainActivity
-                  extends Activity {
+    private final Handler handler =
+        new Handler(Looper.getMainLooper());
 
+    private final Random random =
+        new Random();
 
-              private TextView status;
+    private boolean running = false;
 
+    private int W = 0;
+    private int H = 0;
 
-              @Override
+    private int lastDirection = -1;
 
-              protected void onCreate(
-                      Bundle savedInstanceState) {
+    private int attackCount = 0;
 
+    private int noTargetCount = 0;
 
-                  super.onCreate(
-                      savedInstanceState
-                  );
+    private int lootCount = 0;
 
+    /*
+     * SCREEN RATIOS
+     *
+     * The game is normally landscape.
+     */
 
-                  LinearLayout root =
-                      new LinearLayout(this);
+    private static final float MENU_X = 0.755f;
+    private static final float MENU_Y = 0.075f;
 
+    private static final float AUTO_LOCK_X = 0.755f;
+    private static final float AUTO_LOCK_Y = 0.155f;
 
-                  root.setOrientation(
-                      LinearLayout.VERTICAL
-                  );
+    private static final float ATTACK_X = 0.850f;
+    private static final float ATTACK_Y = 0.815f;
 
+    private static final float LOOT_X = 0.850f;
+    private static final float LOOT_Y = 0.915f;
 
-                  root.setGravity(
-                      Gravity.CENTER_HORIZONTAL
-                  );
+    private static final float JOY_X = 0.135f;
+    private static final float JOY_Y = 0.790f;
 
+    private static final float PLAYER_X = 0.500f;
+    private static final float PLAYER_Y = 0.470f;
 
-                  root.setPadding(
-                      30,
-                      30,
-                      30,
-                      30
-                  );
+    public BotEngine(
+        BotAccessibility service
+    ) {
 
+        this.service = service;
+    }
 
-                  root.setBackgroundColor(
-                      Color.WHITE
-                  );
+    public void start() {
 
+        if (running) {
+            return;
+        }
 
-                  TextView title =
-                      new TextView(this);
+        running = true;
 
+        attackCount = 0;
+        noTargetCount = 0;
+        lootCount = 0;
 
-                  title.setText(
-                      "DUSTINBOT V7"
-                  );
+        lastDirection = -1;
 
+        later(
+            this::autoLock,
+            400
+        );
+    }
 
-                  title.setTextSize(
-                      28
-                  );
+    public void stop() {
 
+        running = false;
 
-                  title.setTextColor(
-                      Color.BLACK
-                  );
+        handler.removeCallbacksAndMessages(null);
+    }
 
+    private void autoLock() {
 
-                  title.setGravity(
-                      Gravity.CENTER
-                  );
+        if (!running) {
+            return;
+        }
 
+        service.tap(
+            MENU_X * W_SAFE(),
+            MENU_Y * H_SAFE()
+        );
 
-                  root.addView(
-                      title
-                  );
+        later(
+            () -> {
 
+                if (!running) {
+                    return;
+                }
 
-                  TextView info =
-                      new TextView(this);
+                service.tap(
+                    AUTO_LOCK_X * W_SAFE(),
+                    AUTO_LOCK_Y * H_SAFE()
+                );
 
+                later(
+                    this::scan,
+                    700
+                );
 
-                  info.setText(
-                      "\n" +
+            },
+            300
+        );
+    }
 
-                      "เดิน → ล็อกเป้าโดยเกม → ตี → " +
-                      "เก็บของ → เดินต่อ\n\n" +
+    private int W_SAFE() {
 
-                      "โหมด CONTINUOUS\n\n" +
+        if (W > 0) {
+            return W;
+        }
 
-                      "ไม่ค้นหา Monster\n" +
+        return 1842;
+    }
 
-                      "ไม่ล็อก Monster เอง"
-                  );
+    private int H_SAFE() {
 
+        if (H > 0) {
+            return H;
+        }
 
-                  info.setTextSize(
-                      17
-                  );
+        return 832;
+    }
 
+    private void scan() {
 
-                  info.setTextColor(
-                      Color.DKGRAY
-                  );
+        if (!running) {
+            return;
+        }
 
+        service.screenshot(
+            new BotAccessibility.ScreenshotCallback() {
 
-                  info.setGravity(
-                      Gravity.CENTER
-                  );
+                @Override
+                public void onSuccess(
+                    Bitmap bitmap
+                ) {
 
+                    try {
 
-                  root.addView(
-                      info
-                  );
+                        if (bitmap == null) {
+                            randomSearch();
+                            return;
+                        }
 
+                        W = bitmap.getWidth();
+                        H = bitmap.getHeight();
 
-                  status =
-                      new TextView(this);
+                        Target target =
+                            Vision.findTarget(bitmap);
 
+                        if (target != null) {
 
-                  status.setText(
-                      "สถานะ: READY"
-                  );
+                            noTargetCount = 0;
 
+                            moveToTarget(
+                                target
+                            );
 
-                  status.setTextSize(
-                      18
-                  );
+                        } else {
 
+                            noTargetCount++;
 
-                  status.setTextColor(
-                      Color.BLACK
-                  );
+                            if (attackCount > 0) {
 
+                                attackCount = 0;
 
-                  status.setGravity(
-                      Gravity.CENTER
-                  );
+                                finishLoot();
 
+                            } else {
 
-                  root.addView(
-                      status
-                  );
+                                randomSearch();
 
+                            }
+                        }
 
-                  Button access =
-                      new Button(this);
+                    } finally {
 
+                        if (!bitmap.isRecycled()) {
+                            bitmap.recycle();
+                        }
 
-                  access.setText(
-                      "1. เปิด ACCESSIBILITY"
-                  );
+                    }
+                }
 
+                @Override
+                public void onFailure() {
 
-                  access.setOnClickListener(
-                      v -> {
+                    if (running) {
 
-                          Intent i =
-                              new Intent(
-                                  Settings
-                                  .ACTION_ACCESSIBILITY_SETTINGS
-                              );
+                        later(
+                            BotEngine.this::randomSearch,
+                            400
+                        );
 
+                    }
+                }
+            }
+        );
+    }
 
-                          startActivity(i);
+    private void moveToTarget(
+        Target target
+    ) {
 
-                      }
-                  );
+        if (!running) {
+            return;
+        }
 
+        if (W <= 0 || H <= 0) {
+            randomSearch();
+            return;
+        }
 
-                  root.addView(
-                      access
-                  );
+        float tx =
+            target.x / (float) W;
 
+        float ty =
+            target.y / (float) H;
 
-                  Button start =
-                      new Button(this);
+        float dx =
+            tx - PLAYER_X;
 
+        float dy =
+            ty - PLAYER_Y;
 
-                  start.setText(
-                      "2. START BOT"
-                  );
+        float distance =
+            (float) Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
 
+        /*
+         * Target is close enough.
+         * Attack instead of continuing to walk.
+         */
 
-                  start.setOnClickListener(
-                      v -> {
+        if (distance < 0.075f) {
 
+            attack();
 
-                          if (
-                              BotAccessibilityService
-                              .instance == null
-                          ) {
+            return;
+        }
 
+        /*
+         * Target is not close.
+         * Move toward it.
+         */
 
-                              status.setText(
-                                  "กรุณาเปิด ACCESSIBILITY ก่อน"
-                              );
+        float length =
+            (float) Math.sqrt(
+                dx * dx +
+                dy * dy
+            );
 
+        if (length < 0.001f) {
 
-                              return;
+            attack();
 
-                          }
+            return;
+        }
 
+        dx /= length;
+        dy /= length;
 
-                          BotAccessibilityService
-                              .instance
-                              .startBot();
+        joystick(
+            dx,
+            dy,
+            380
+        );
 
+        later(
+            this::scan,
+            500
+        );
+    }
 
-                          status.setText(
-                              "BOT RUNNING\n\n" +
+    private void attack() {
 
-                              "เดิน → ตี → เก็บ → เดิน"
-                          );
+        if (!running) {
+            return;
+        }
 
-                      }
-                  );
+        attackCount++;
 
+        service.tap(
+            ATTACK_X * W_SAFE(),
+            ATTACK_Y * H_SAFE()
+        );
 
-                  root.addView(
-                      start
-                  );
+        /*
+         * Do not attack forever.
+         * If the target remains after several attempts,
+         * treat it as an unsuitable/unreachable target
+         * and go search somewhere else.
+         */
 
+        if (attackCount >= 8) {
 
-                  Button stop =
-                      new Button(this);
+            attackCount = 0;
 
+            randomSearch();
 
-                  stop.setText(
-                      "3. STOP BOT"
-                  );
+            return;
+        }
 
+        later(
+            this::scan,
+            650
+        );
+    }
 
-                  stop.setOnClickListener(
-                      v -> {
+    private void finishLoot() {
 
+        if (!running) {
+            return;
+        }
 
-                          if (
-                              BotAccessibilityService
-                              .instance != null
-                          ) {
+        lootCount = 0;
 
+        lootStep();
+    }
 
-                              BotAccessibilityService
-                                  .instance
-                                  .stopBot();
+    private void lootStep() {
 
-                          }
+        if (!running) {
+            return;
+        }
 
+        lootCount++;
 
-                          status.setText(
-                              "สถานะ: STOP"
-                          );
+        service.tap(
+            LOOT_X * W_SAFE(),
+            LOOT_Y * H_SAFE()
+        );
 
-                      }
-                  );
+        /*
+         * Small movement around the character.
+         * This helps collect items that are not exactly
+         * under the character.
+         */
 
+        int direction =
+            lootCount % 4;
 
-                  root.addView(
-                      stop
-                  );
+        float dx = 0;
+        float dy = 0;
 
+        switch (direction) {
 
-                  setContentView(
-                      root
-                  );
+            case 0:
+                dx = 0;
+                dy = -1;
+                break;
 
-              }
+            case 1:
+                dx = 1;
+                dy = 0;
+                break;
 
+            case 2:
+                dx = 0;
+                dy = 1;
+                break;
 
-              @Override
+            case 3:
+                dx = -1;
+                dy = 0;
+                break;
+        }
 
-              protected void onResume() {
+        joystick(
+            dx,
+            dy,
+            180
+        );
 
-                  super.onResume();
+        if (lootCount < 6) {
 
+            later(
+                this::lootStep,
+                280
+            );
 
-                  if (
-                      BotAccessibilityService
-                      .instance == null
-                  ) {
+        } else {
 
-                      status.setText(
-                          "สถานะ: ACCESSIBILITY OFF"
-                      );
+            lootCount = 0;
 
-                  }
+            later(
+                this::randomSearch,
+                450
+            );
+        }
+    }
 
-              }
+    private void randomSearch() {
 
-          }
+        if (!running) {
+            return;
+        }
 
-          EOF
+        /*
+         * Random 8-direction movement.
+         *
+         * 0 = up
+         * 1 = up-right
+         * 2 = right
+         * 3 = down-right
+         * 4 = down
+         * 5 = down-left
+         * 6 = left
+         * 7 = up-left
+         */
 
+        int direction;
 
-          # =====================================================
-          # BOT ACCESSIBILITY SERVICE
-          # =====================================================
+        do {
 
-          cat > app/src/main/java/com/dustinbot/v7/BotAccessibilityService.java <<'EOF'
+            direction =
+                random.nextInt(8);
 
-          package com.dustinbot.v7;
+        } while (
+            direction == lastDirection &&
+            random.nextBoolean()
+        );
 
+        lastDirection = direction;
 
-          import android.accessibilityservice.AccessibilityService;
+        float[][] directions = {
 
-          import android.accessibilityservice.GestureDescription;
+            { 0f, -1f },
 
-          import android.graphics.Path;
+            { 0.707f, -0.707f },
 
-          import android.os.Handler;
+            { 1f, 0f },
 
-          import android.os.Looper;
+            { 0.707f, 0.707f },
 
-          import android.view.Display;
+            { 0f, 1f },
 
-          import android.view.WindowManager;
+            { -0.707f, 0.707f },
 
-          import android.view.accessibility.AccessibilityEvent;
+            { -1f, 0f },
 
+            { -0.707f, -0.707f }
 
-          public class BotAccessibilityService
-                  extends AccessibilityService {
+        };
 
+        float dx =
+            directions[direction][0];
 
-              public static volatile
-              BotAccessibilityService instance;
+        float dy =
+            directions[direction][1];
 
+        int duration =
+            550 +
+            random.nextInt(950);
 
-              private final Handler handler =
-                  new Handler(
-                      Looper.getMainLooper()
-                  );
+        joystick(
+            dx,
+            dy,
+            duration
+        );
 
+        /*
+         * After each random movement,
+         * immediately scan for a target.
+         */
 
-              private volatile boolean running =
-                  false;
+        later(
+            this::scan,
+            350
+        );
+    }
 
+    private void joystick(
+        float dx,
+        float dy,
+        long duration
+    ) {
 
-              private boolean moveRight =
-                  true;
+        if (!running) {
+            return;
+        }
 
+        int width =
+            W_SAFE();
 
-              private int cycle =
-                  0;
+        int height =
+            H_SAFE();
 
+        float centerX =
+            width * JOY_X;
 
-              @Override
+        float centerY =
+            height * JOY_Y;
 
-              protected void onServiceConnected() {
+        float radius =
+            Math.min(
+                width,
+                height
+            ) * 0.105f;
 
+        float endX =
+            centerX +
+            dx * radius;
 
-                  super.onServiceConnected();
+        float endY =
+            centerY +
+            dy * radius;
 
+        service.swipe(
+            centerX,
+            centerY,
+            endX,
+            endY,
+            duration
+        );
 
-                  instance =
-                      this;
+        /*
+         * Release joystick.
+         */
 
-              }
+        later(
+            () -> {
 
+                if (!running) {
+                    return;
+                }
 
-              @Override
+                service.tap(
+                    centerX,
+                    centerY
+                );
 
-              public void onAccessibilityEvent(
-                      AccessibilityEvent event) {
+            },
+            duration + 40
+        );
+    }
 
-                  /*
-                   *
-                   * ไม่ใช้ Event
-                   * เพื่อค้นหา Monster
-                   *
-                   * เกมเป็นคนล็อกเป้า
-                   *
-                   */
+    /*
+     * THIS WAS THE MISSING METHOD
+     * IN BUILD #33.
+     *
+     * V9.1 called later(...) from many places,
+     * but BotEngine did not contain the method.
+     */
 
-              }
+    private void later(
+        Runnable runnable,
+        long delay
+    ) {
 
+        if (runnable == null) {
+            return;
+        }
 
-              @Override
+        handler.postDelayed(
+            runnable,
+            delay
+        );
+    }
 
-              public void onInterrupt() {
+    private static class Target {
 
-                  stopBot();
+        final float x;
+        final float y;
 
-              }
+        Target(
+            float x,
+            float y
+        ) {
 
+            this.x = x;
+            this.y = y;
+        }
+    }
 
-              // =================================================
-              // START
-              // =================================================
+    private static class Vision {
 
-              public void startBot() {
+        /*
+         * Detect the white target marker/arrow
+         * above a monster.
+         *
+         * The search deliberately ignores:
+         *
+         * - top menu area
+         * - bottom controls
+         * - extreme left/right edges
+         *
+         * so UI buttons are less likely to become
+         * false targets.
+         */
 
+        static Target findTarget(
+            Bitmap bitmap
+        ) {
 
-                  if (running) {
+            int width =
+                bitmap.getWidth();
 
-                      return;
+            int height =
+                bitmap.getHeight();
 
-                  }
+            int startX =
+                (int) (width * 0.12f);
 
+            int endX =
+                (int) (width * 0.88f);
 
-                  running =
-                      true;
+            int startY =
+                (int) (height * 0.18f);
 
+            int endY =
+                (int) (height * 0.70f);
 
-                  cycle =
-                      0;
+            /*
+             * Step size keeps screenshot processing
+             * light enough for a phone.
+             */
 
+            int step = 4;
 
-                  moveRight =
-                      true;
+            Target best = null;
 
+            int bestScore = 0;
 
-                  botLoop();
+            for (
+                int y = startY;
+                y < endY;
+                y += step
+            ) {
 
-              }
+                for (
+                    int x = startX;
+                    x < endX;
+                    x += step
+                ) {
 
+                    int score =
+                        arrowScore(
+                            bitmap,
+                            x,
+                            y
+                        );
 
-              // =================================================
-              // STOP
-              // =================================================
+                    if (
+                        score > bestScore
+                    ) {
 
-              public void stopBot() {
+                        bestScore = score;
 
+                        /*
+                         * The detected bright marker
+                         * is above the monster.
+                         *
+                         * Aim a little below it.
+                         */
 
-                  running =
-                      false;
+                        best =
+                            new Target(
+                                x,
+                                Math.min(
+                                    height - 1,
+                                    y + 38
+                                )
+                            );
+                    }
+                }
+            }
 
+            if (bestScore < 18) {
+                return null;
+            }
 
-                  handler.removeCallbacksAndMessages(
-                      null
-                  );
+            return best;
+        }
 
-              }
+        private static int arrowScore(
+            Bitmap bitmap,
+            int cx,
+            int cy
+        ) {
 
+            int width =
+                bitmap.getWidth();
 
-              // =================================================
-              // STATUS
-              // =================================================
+            int height =
+                bitmap.getHeight();
 
-              public boolean isBotRunning() {
+            int score = 0;
 
-                  return running;
+            /*
+             * Small downward triangle pattern.
+             */
 
-              }
+            int[][] rows = {
 
+                { 1, 1 },
 
-              // =================================================
-              // GET SCREEN SIZE
-              // =================================================
+                { 3, 1 },
 
-              private int screenWidth() {
+                { 5, 2 },
 
+                { 7, 3 },
 
-                  WindowManager wm =
-                      (WindowManager)
-                      getSystemService(
-                          WINDOW_SERVICE
-                      );
+                { 9, 4 }
 
+            };
 
-                  Display display =
-                      wm.getDefaultDisplay();
+            for (
+                int[] row : rows
+            ) {
 
+                int y =
+                    cy + row[0];
 
-                  android.graphics.Point p =
-                      new android.graphics.Point();
+                int radius =
+                    row[1];
 
+                for (
+                    int x =
+                        cx - radius;
+                    x <=
+                        cx + radius;
+                    x++
+                ) {
 
-                  display.getRealSize(p);
+                    if (
+                        x < 0 ||
+                        y < 0 ||
+                        x >= width ||
+                        y >= height
+                    ) {
+                        continue;
+                    }
 
+                    int color =
+                        bitmap.getPixel(
+                            x,
+                            y
+                        );
 
-                  return p.x;
+                    int r =
+                        Color.red(color);
 
-              }
+                    int g =
+                        Color.green(color);
 
+                    int b =
+                        Color.blue(color);
 
-              private int screenHeight() {
+                    /*
+                     * White/near-white pixel.
+                     */
 
+                    if (
+                        r > 210 &&
+                        g > 210 &&
+                        b > 210
+                    ) {
 
-                  WindowManager wm =
-                      (WindowManager)
-                      getSystemService(
-                          WINDOW_SERVICE
-                      );
+                        int max =
+                            Math.max(
+                                r,
+                                Math.max(g, b)
+                            );
 
+                        int min =
+                            Math.min(
+                                r,
+                                Math.min(g, b)
+                            );
 
-                  Display display =
-                      wm.getDefaultDisplay();
+                        if (
+                            max - min < 35
+                        ) {
 
+                            score++;
+                        }
+                    }
+                }
+            }
 
-                  android.graphics.Point p =
-                      new android.graphics.Point();
+            /*
+             * Require dark-ish area below
+             * the marker to reduce false positives.
+             */
 
+            int darkCount = 0;
 
-                  display.getRealSize(p);
+            for (
+                int yy = cy + 8;
+                yy < cy + 28 &&
+                yy < height;
+                yy += 3
+            ) {
 
+                int xx =
+                    Math.max(
+                        0,
+                        Math.min(
+                            width - 1,
+                            cx
+                        )
+                    );
 
-                  return p.y;
+                int color =
+                    bitmap.getPixel(
+                        xx,
+                        yy
+                    );
 
-              }
+                int r =
+                    Color.red(color);
 
+                int g =
+                    Color.green(color);
 
-              // =================================================
-              // BOT LOOP
-              // =================================================
+                int b =
+                    Color.blue(color);
 
-              private void botLoop() {
+                if (
+                    r < 150 ||
+                    g < 150 ||
+                    b < 150
+                ) {
 
+                    darkCount++;
+                }
+            }
 
-                  if (!running) {
+            if (darkCount >= 3) {
+                score += 5;
+            }
 
-                      return;
-
-                  }
-
-
-                  int w =
-                      screenWidth();
-
-
-                  int h =
-                      screenHeight();
-
-
-                  /*
-                   *
-                   * หน้าจอ Dustin RO เป็นแนวนอน
-                   *
-                   * ใช้เปอร์เซ็นต์แทน Pixel
-                   *
-                   */
-
-
-                  // ---------------------------------------------
-                  // JOYSTICK
-                  // ---------------------------------------------
-
-                  float moveX =
-                      w * 0.115f;
-
-
-                  float moveY =
-                      h * 0.79f;
-
-
-                  // ---------------------------------------------
-                  // ATTACK
-                  // ---------------------------------------------
-
-                  float attackX =
-                      w * 0.82f;
-
-
-                  float attackY =
-                      h * 0.79f;
-
-
-                  // ---------------------------------------------
-                  // LOOT HAND
-                  // ---------------------------------------------
-
-                  float lootX =
-                      w * 0.165f;
-
-
-                  float lootY =
-                      h * 0.79f;
-
-
-                  // =================================================
-                  // WALK
-                  // =================================================
-
-
-                  float directionX;
-
-
-                  if (moveRight) {
-
-                      directionX =
-                          w * 0.25f;
-
-                  } else {
-
-                      directionX =
-                          w * 0.02f;
-
-                  }
-
-
-                  swipe(
-
-                      moveX,
-
-                      moveY,
-
-                      directionX,
-
-                      moveY,
-
-                      1300
-
-                  );
-
-
-                  // =================================================
-                  // ATTACK
-                  // =================================================
-
-
-                  handler.postDelayed(
-
-                      () -> {
-
-
-                          if (!running) {
-
-                              return;
-
-                          }
-
-
-                          tap(
-
-                              attackX,
-
-                              attackY
-
-                          );
-
-
-                          handler.postDelayed(
-
-                              () -> {
-
-
-                                  if (!running) {
-
-                                      return;
-
-                                  }
-
-
-                                  tap(
-
-                                      attackX,
-
-                                      attackY
-
-                                  );
-
-
-                                  handler.postDelayed(
-
-                                      () -> {
-
-
-                                          if (!running) {
-
-                                              return;
-
-                                          }
-
-
-                                          tap(
-
-                                              attackX,
-
-                                              attackY
-
-                                          );
-
-
-                                          // =================================
-                                          // WAIT
-                                          // =================================
-
-                                          handler.postDelayed(
-
-                                              () -> {
-
-
-                                                  if (!running) {
-
-                                                      return;
-
-                                                  }
-
-
-                                                  // =========================
-                                                  // LOOT
-                                                  // =========================
-
-                                                  tap(
-
-                                                      lootX,
-
-                                                      lootY
-
-                                                  );
-
-
-                                                  // =========================
-                                                  // NEXT WALK
-                                                  // =========================
-
-                                                  handler.postDelayed(
-
-                                                      () -> {
-
-
-                                                          if (!running) {
-
-                                                              return;
-
-                                                          }
-
-
-                                                          cycle++;
-
-
-                                                          /*
-                                                           *
-                                                           * เปลี่ยนทิศ
-                                                           * ทุก 6 รอบ
-                                                           *
-                                                           */
-
-                                                          if (
-                                                              cycle >= 6
-                                                          ) {
-
-
-                                                              cycle =
-                                                                  0;
-
-
-                                                              moveRight =
-                                                                  !moveRight;
-
-                                                          }
-
-
-                                                          botLoop();
-
-
-                                                      },
-
-                                                      700
-
-                                                  );
-
-
-                                              },
-
-                                              900
-
-                                          );
-
-
-                                      },
-
-                                      500
-
-                                  );
-
-
-                              },
-
-                              500
-
-                          );
-
-
-                      },
-
-                      1200
-
-                  );
-
-              }
-
-
-              // =================================================
-              // TAP
-              // =================================================
-
-              private boolean tap(
-
-                      float x,
-
-                      float y
-
-              ) {
-
-
-                  if (!running) {
-
-                      return false;
-
-                  }
-
-
-                  Path path =
-                      new Path();
-
-
-                  path.moveTo(
-                      x,
-                      y
-                  );
-
-
-                  GestureDescription gesture =
-
-                      new GestureDescription.Builder()
-
-                          .addStroke(
-
-                              new GestureDescription
-                                  .StrokeDescription(
-
-                                      path,
-
-                                      0,
-
-                                      80
-
-                                  )
-
-                          )
-
-                          .build();
-
-
-                  return dispatchGesture(
-
-                      gesture,
-
-                      null,
-
-                      null
-
-                  );
-
-              }
-
-
-              // =================================================
-              // SWIPE
-              // =================================================
-
-              private boolean swipe(
-
-                      float x1,
-
-                      float y1,
-
-                      float x2,
-
-                      float y2,
-
-                      long duration
-
-              ) {
-
-
-                  if (!running) {
-
-                      return false;
-
-                  }
-
-
-                  Path path =
-                      new Path();
-
-
-                  path.moveTo(
-
-                      x1,
-
-                      y1
-
-                  );
-
-
-                  path.lineTo(
-
-                      x2,
-
-                      y2
-
-                  );
-
-
-                  GestureDescription gesture =
-
-                      new GestureDescription.Builder()
-
-                          .addStroke(
-
-                              new GestureDescription
-                                  .StrokeDescription(
-
-                                      path,
-
-                                      0,
-
-                                      duration
-
-                                  )
-
-                          )
-
-                          .build();
-
-
-                  return dispatchGesture(
-
-                      gesture,
-
-                      null,
-
-                      null
-
-                  );
-
-              }
-
-
-              // =================================================
-              // DESTROY
-              // =================================================
-
-              @Override
-
-              public void onDestroy() {
-
-
-                  stopBot();
-
-
-                  instance =
-                      null;
-
-
-                  super.onDestroy();
-
-              }
-
-          }
-
-          EOF
-
-
-      # =========================================================
-      # BUILD
-      # =========================================================
+            return score;
+        }
+    }
+}
+EOF
 
       - name: Build APK
-
         shell: bash
-
         run: |
 
-          gradle wrapper --gradle-version 8.7
+          set -e
 
-          chmod +x gradlew
+          gradle :app:assembleDebug --no-daemon --stacktrace
 
-          ./gradlew clean assembleDebug --stacktrace
-
-
-      # =========================================================
-      # VERIFY
-      # =========================================================
-
-      - name: Verify APK
-
+      - name: Rename APK
         shell: bash
-
         run: |
 
-          test -f \
-            app/build/outputs/apk/debug/app-debug.apk
+          set -e
 
-          ls -lh \
-            app/build/outputs/apk/debug/app-debug.apk
+          mkdir -p output
 
-
-      # =========================================================
-      # UPLOAD
-      # =========================================================
+          cp \
+            app/build/outputs/apk/debug/app-debug.apk \
+            output/DustinBotV9.2-RANDOM-LOOT.apk
 
       - name: Upload APK
-
         uses: actions/upload-artifact@v4
-
         with:
-
-          name: DustinBot-V7-APK
-
-          path:
-            app/build/outputs/apk/debug/app-debug.apk
+          name: DUSTIN-BOT-V9.2-RANDOM-LOOT
+          path: output/DustinBotV9.2-RANDOM-LOOT.apk
+          if-no-files-found: error
