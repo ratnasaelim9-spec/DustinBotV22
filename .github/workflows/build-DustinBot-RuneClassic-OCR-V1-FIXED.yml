@@ -1,0 +1,1068 @@
+name: Build DustinBot RuneClassic OCR V1
+run-name: DustinBot OCR V1 APK Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          rm -rf app
+          mkdir -p app/src/main/java/com/dustinbot/v1
+          mkdir -p app/src/main/res/values
+          mkdir -p app/src/main/res/xml
+
+          cat > settings.gradle <<'EOF'
+pluginManagement {
+    repositories {
+        google()
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+rootProject.name = "DustinBotOCR"
+include(":app")
+EOF
+
+          cat > build.gradle <<'EOF'
+plugins {
+    id "com.android.application" version "8.6.1" apply false
+}
+EOF
+
+          cat > app/build.gradle <<'EOF'
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "com.dustinbot.v1"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.dustinbot.v1"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+    }
+}
+
+dependencies {
+    implementation "com.google.mlkit:text-recognition:16.0.1"
+}
+EOF
+
+          cat > app/src/main/res/values/strings.xml <<'EOF'
+<resources>
+    <string name="app_name">DustinBot OCR</string>
+</resources>
+EOF
+
+          cat > app/src/main/res/values/themes.xml <<'EOF'
+<resources>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#42A5F5</item>
+        <item name="android:navigationBarColor">#07111F</item>
+        <item name="android:statusBarColor">#07111F</item>
+    </style>
+</resources>
+EOF
+
+          cat > app/src/main/res/xml/accessibility_service_config.xml <<'EOF'
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="true"
+    android:canPerformGestures="true"
+    android:description="@string/app_name" />
+EOF
+
+          cat > app/src/main/AndroidManifest.xml <<'EOF'
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:theme="@style/AppTheme">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="portrait">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <service
+            android:name=".BotAccessibilityService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+
+        </service>
+
+        <service
+            android:name=".CaptureService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+    </application>
+
+</manifest>
+EOF
+
+          cat > app/src/main/java/com/dustinbot/v1/BotAccessibilityService.java <<'EOF'
+package com.dustinbot.v1;
+
+import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
+import android.view.accessibility.AccessibilityEvent;
+
+public class BotAccessibilityService extends AccessibilityService {
+
+    static volatile BotAccessibilityService instance;
+
+    @Override
+    protected void onServiceConnected() {
+        super.onServiceConnected();
+        instance = this;
+    }
+
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+    }
+
+    @Override
+    public void onInterrupt() {
+        instance = null;
+    }
+
+    static boolean tap(float x, float y) {
+        BotAccessibilityService service = instance;
+
+        if (service == null) {
+            return false;
+        }
+
+        Path path = new Path();
+        path.moveTo(x, y);
+
+        GestureDescription gesture =
+            new GestureDescription.Builder()
+                .addStroke(
+                    new GestureDescription.StrokeDescription(
+                        path,
+                        0,
+                        70
+                    )
+                )
+                .build();
+
+        return service.dispatchGesture(
+            gesture,
+            null,
+            null
+        );
+    }
+}
+EOF
+
+          cat > app/src/main/java/com/dustinbot/v1/MonsterDatabase.java <<'EOF'
+package com.dustinbot.v1;
+
+import java.util.ArrayList;
+import java.util.Locale;
+
+public class MonsterDatabase {
+
+    public static class M {
+        public final int id;
+        public final String name;
+        public final String code;
+
+        M(int id, String name, String code) {
+            this.id = id;
+            this.name = name;
+            this.code = code;
+        }
+
+        @Override
+        public boolean equals(Object value) {
+            return value instanceof M && ((M) value).id == id;
+        }
+
+        @Override
+        public int hashCode() {
+            return id;
+        }
+    }
+
+    private final ArrayList<M> monsters = new ArrayList<>();
+
+    public MonsterDatabase() {
+        add(1002, "Poring", "Poring");
+        add(1007, "Fabre", "Fabre");
+        add(1008, "Pupa", "Pupa");
+        add(1009, "Condor", "Condor");
+        add(1011, "Lunatic", "Lunatic");
+        add(1012, "Hornet", "Hornet");
+        add(1013, "Wolf", "Wolf");
+        add(1014, "Spore", "Spore");
+        add(1015, "Zombie", "Zombie");
+        add(1016, "Archer Skeleton", "Archer_Skeleton");
+        add(1019, "Thief Bug", "Thief_Bug");
+        add(1020, "Rocker", "Rocker");
+        add(1023, "Muka", "Muka");
+        add(1024, "Soldier Skeleton", "Soldier_Skeleton");
+        add(1025, "Isis", "Isis");
+        add(1026, "Anacondaq", "Anacondaq");
+        add(1031, "Poporing", "Poporing");
+        add(1036, "Willow", "Willow");
+        add(1040, "Horn", "Horn");
+        add(1041, "Flora", "Flora");
+        add(1042, "Hydra", "Hydra");
+        add(1045, "Goblin", "Goblin");
+        add(1046, "Goblin Archer", "Goblin_Archer");
+        add(1049, "Goblin Leader", "Goblin_Leader");
+        add(1050, "Kobold", "Kobold");
+        add(1051, "Kobold Archer", "Kobold_Archer");
+        add(1052, "Kobold Leader", "Kobold_Leader");
+        add(1053, "Mummy", "Mummy");
+        add(1055, "Zenorc", "Zenorc");
+        add(1056, "Drainliar", "Drainliar");
+        add(1057, "Whisper", "Whisper");
+        add(1058, "Baphomet Jr.", "Baphomet_Jr");
+        add(1059, "Bongun", "Bongun");
+        add(1060, "Munak", "Munak");
+        add(1063, "Mantis", "Mantis");
+        add(1064, "Yoyo", "Yoyo");
+        add(1068, "Creamy", "Creamy");
+        add(1070, "Smokie", "Smokie");
+        add(1076, "Elder Willow", "Elder_Willow");
+        add(1080, "Argiope", "Argiope");
+        add(1086, "Golden Thief Bug", "Golden_Thief_Bug");
+        add(1090, "Frilldora", "Frilldora");
+        add(1091, "Swordfish", "Swordfish");
+        add(1092, "Obeaune", "Obeaune");
+        add(1093, "Marc", "Marc");
+        add(1094, "Cornutus", "Cornutus");
+        add(1111, "Drops", "Drops");
+        add(1113, "Marin", "Marin");
+        add(1115, "Mastering", "Mastering");
+        add(1121, "Miner", "Miner");
+        add(1123, "Nightmare", "Nightmare");
+        add(1124, "Deviling", "Deviling");
+        add(1126, "Deviruchi", "Deviruchi");
+        add(1127, "Doppelganger", "Doppelganger");
+        add(1139, "Marduk", "Marduk");
+        add(1142, "Megalodon", "Megalodon");
+        add(1143, "Thara Frog", "Thara_Frog");
+        add(1151, "Strouf", "Strouf");
+        add(1152, "Vadon", "Vadon");
+        add(1153, "Marse", "Marse");
+        add(1155, "Phen", "Phen");
+        add(1158, "Penomena", "Penomena");
+        add(1159, "Peco Peco", "Peco_Peco");
+        add(1160, "Grand Peco", "Grand_Peco");
+        add(1179, "Dokebi", "Dokebi");
+        add(1180, "Pasana", "Pasana");
+        add(1183, "Minorous", "Minorous");
+        add(1184, "Nightmare Terror", "Nightmare_Terror");
+        add(1186, "Mimic", "Mimic");
+        add(1190, "Orc Lord", "Orc_Lord");
+        add(1191, "Orc Hero", "Orc_Hero");
+        add(1192, "Orc Skeleton", "Orc_Skeleton");
+        add(1193, "Orc Zombie", "Orc_Zombie");
+        add(1195, "Desert Wolf", "Desert_Wolf");
+        add(1200, "Familiar", "Familiar");
+    }
+
+    private void add(int id, String name, String code) {
+        monsters.add(new M(id, name, code));
+    }
+
+    public ArrayList<M> search(String query) {
+        ArrayList<M> result = new ArrayList<>();
+
+        String q = query == null
+            ? ""
+            : query.trim().toLowerCase(Locale.US);
+
+        for (M monster : monsters) {
+            if (q.isEmpty()
+                || monster.name.toLowerCase(Locale.US).contains(q)
+                || monster.code.toLowerCase(Locale.US).contains(q)
+                || String.valueOf(monster.id).equals(q)) {
+                result.add(monster);
+            }
+        }
+
+        return result;
+    }
+
+    public static String norm(String value) {
+        if (value == null) {
+            return "";
+        }
+
+        return value
+            .toLowerCase(Locale.US)
+            .replaceAll("[^a-z0-9]", "");
+    }
+}
+EOF
+
+          cat > app/src/main/java/com/dustinbot/v1/CaptureService.java <<'EOF'
+package com.dustinbot.v1;
+
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.Service;
+import android.content.Intent;
+import android.graphics.Rect;
+import android.hardware.display.DisplayManager;
+import android.hardware.display.VirtualDisplay;
+import android.media.Image;
+import android.media.ImageReader;
+import android.media.projection.MediaProjection;
+import android.media.projection.MediaProjectionManager;
+import android.os.Handler;
+import android.os.IBinder;
+import android.os.Looper;
+import android.util.DisplayMetrics;
+
+import com.google.mlkit.vision.common.InputImage;
+import com.google.mlkit.vision.text.Text;
+import com.google.mlkit.vision.text.TextRecognition;
+import com.google.mlkit.vision.text.TextRecognizer;
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
+
+import java.util.Collections;
+import java.util.Set;
+
+public class CaptureService extends Service {
+
+    static final String EXTRA_RESULT = "result";
+    static final String EXTRA_DATA = "data";
+
+    static volatile Set<String> targets =
+        Collections.emptySet();
+
+    private MediaProjection projection;
+    private VirtualDisplay virtualDisplay;
+    private ImageReader reader;
+    private Handler handler;
+    private TextRecognizer recognizer;
+    private long lastTap = 0;
+
+    @Override
+    public int onStartCommand(
+        Intent intent,
+        int flags,
+        int startId
+    ) {
+        createChannel();
+
+        Notification notification =
+            new Notification.Builder(
+                this,
+                "dustinbot_capture"
+            )
+            .setContentTitle("DustinBot OCR")
+            .setContentText(
+                "กำลังตรวจจับ Monster บนหน้าจอ"
+            )
+            .setSmallIcon(
+                android.R.drawable.ic_menu_view
+            )
+            .build();
+
+        startForeground(1101, notification);
+
+        if (intent != null &&
+            intent.hasExtra(EXTRA_RESULT)) {
+
+            int resultCode =
+                intent.getIntExtra(EXTRA_RESULT, 0);
+
+            Intent data =
+                intent.getParcelableExtra(EXTRA_DATA);
+
+            startCapture(
+                resultCode,
+                data
+            );
+        }
+
+        return START_STICKY;
+    }
+
+    private void startCapture(
+        int resultCode,
+        Intent data
+    ) {
+        if (projection != null) {
+            return;
+        }
+
+        DisplayMetrics dm =
+            getResources().getDisplayMetrics();
+
+        int width = dm.widthPixels;
+        int height = dm.heightPixels;
+        int density = dm.densityDpi;
+
+        MediaProjectionManager manager =
+            (MediaProjectionManager)
+            getSystemService(
+                MEDIA_PROJECTION_SERVICE
+            );
+
+        projection =
+            manager.getMediaProjection(
+                resultCode,
+                data
+            );
+
+        reader =
+            ImageReader.newInstance(
+                width,
+                height,
+                android.graphics.PixelFormat.RGBA_8888,
+                2
+            );
+
+        handler =
+            new Handler(
+                Looper.getMainLooper()
+            );
+
+        recognizer =
+            TextRecognition.getClient(
+                TextRecognizerOptions.DEFAULT_OPTIONS
+            );
+
+        virtualDisplay =
+            projection.createVirtualDisplay(
+                "DustinBotOCR",
+                width,
+                height,
+                density,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                reader.getSurface(),
+                null,
+                handler
+            );
+
+        reader.setOnImageAvailableListener(
+            imageReader -> {
+                Image image =
+                    imageReader.acquireLatestImage();
+
+                if (image != null) {
+                    processImage(image);
+                }
+            },
+            handler
+        );
+    }
+
+    private void processImage(Image image) {
+
+        InputImage input =
+            InputImage.fromMediaImage(
+                image,
+                0
+            );
+
+        recognizer
+            .process(input)
+            .addOnSuccessListener(
+                result -> {
+
+                    long now =
+                        System.currentTimeMillis();
+
+                    if (now - lastTap < 900) {
+                        return;
+                    }
+
+                    for (
+                        Text.TextBlock block :
+                        result.getTextBlocks()
+                    ) {
+
+                        for (
+                            Text.Line line :
+                            block.getLines()
+                        ) {
+
+                            String raw =
+                                line.getText();
+
+                            String detected =
+                                MonsterDatabase.norm(
+                                    raw
+                                );
+
+                            for (
+                                String target :
+                                targets
+                            ) {
+
+                                String wanted =
+                                    MonsterDatabase.norm(
+                                        target
+                                    );
+
+                                if (wanted.length() < 3) {
+                                    continue;
+                                }
+
+                                if (
+                                    detected.equals(wanted)
+                                    ||
+                                    detected.contains(wanted)
+                                    ||
+                                    wanted.contains(detected)
+                                ) {
+
+                                    Rect box =
+                                        line.getBoundingBox();
+
+                                    if (box == null) {
+                                        continue;
+                                    }
+
+                                    float x =
+                                        box.centerX();
+
+                                    float y =
+                                        box.centerY();
+
+                                    if (
+                                        BotAccessibilityService.tap(
+                                            x,
+                                            y
+                                        )
+                                    ) {
+
+                                        lastTap = now;
+
+                                        MainActivity.postStatus(
+                                            "พบ "
+                                            + raw
+                                            + " → แตะ "
+                                            + (int)x
+                                            + ","
+                                            + (int)y
+                                        );
+
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            )
+            .addOnCompleteListener(
+                task -> image.close()
+            );
+    }
+
+    private void createChannel() {
+
+        NotificationManager manager =
+            getSystemService(
+                NotificationManager.class
+            );
+
+        manager.createNotificationChannel(
+            new NotificationChannel(
+                "dustinbot_capture",
+                "DustinBot Capture",
+                NotificationManager.IMPORTANCE_LOW
+            )
+        );
+    }
+
+    @Override
+    public void onDestroy() {
+
+        try {
+            if (reader != null) {
+                reader.close();
+            }
+
+            if (virtualDisplay != null) {
+                virtualDisplay.release();
+            }
+
+            if (projection != null) {
+                projection.stop();
+            }
+
+            if (recognizer != null) {
+                recognizer.close();
+            }
+
+        } catch (Exception ignored) {
+        }
+
+        super.onDestroy();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
+    }
+}
+EOF
+
+          cat > app/src/main/java/com/dustinbot/v1/MainActivity.java <<'EOF'
+package com.dustinbot.v1;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.graphics.Color;
+import android.media.projection.MediaProjectionManager;
+import android.os.Bundle;
+import android.provider.Settings;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import java.util.ArrayList;
+import java.util.HashSet;
+
+public class MainActivity extends Activity {
+
+    static MainActivity instance;
+
+    MonsterDatabase database;
+    LinearLayout monsterList;
+    EditText search;
+    TextView status;
+
+    ArrayList<MonsterDatabase.M> selected =
+        new ArrayList<>();
+
+    int dp(int value) {
+        return (int)(
+            value *
+            getResources()
+                .getDisplayMetrics()
+                .density
+            + 0.5f
+        );
+    }
+
+    TextView text(
+        String value,
+        int size
+    ) {
+        TextView view =
+            new TextView(this);
+
+        view.setText(value);
+        view.setTextColor(Color.WHITE);
+        view.setTextSize(size);
+
+        view.setPadding(
+            dp(8),
+            dp(8),
+            dp(8),
+            dp(8)
+        );
+
+        return view;
+    }
+
+    @Override
+    public void onCreate(Bundle state) {
+
+        super.onCreate(state);
+
+        instance = this;
+
+        database =
+            new MonsterDatabase();
+
+        buildUI();
+    }
+
+    private void buildUI() {
+
+        LinearLayout root =
+            new LinearLayout(this);
+
+        root.setOrientation(
+            LinearLayout.VERTICAL
+        );
+
+        root.setPadding(
+            dp(14),
+            dp(10),
+            dp(14),
+            dp(20)
+        );
+
+        root.setBackgroundColor(
+            Color.rgb(7, 17, 31)
+        );
+
+        TextView title =
+            text(
+                "DustinBot OCR V1",
+                26
+            );
+
+        title.setTextColor(
+            Color.rgb(80, 170, 255)
+        );
+
+        root.addView(title);
+
+        root.addView(
+            text(
+                "Rune Classic • อ่านชื่อ Monster จากหน้าจอจริง",
+                14
+            )
+        );
+
+        status =
+            text(
+                "สถานะ: READY",
+                15
+            );
+
+        root.addView(status);
+
+        Button accessibility =
+            new Button(this);
+
+        accessibility.setText(
+            "1. เปิด Accessibility"
+        );
+
+        accessibility.setOnClickListener(
+            v ->
+                startActivity(
+                    new Intent(
+                        Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    )
+                )
+        );
+
+        root.addView(accessibility);
+
+        Button capture =
+            new Button(this);
+
+        capture.setText(
+            "2. เริ่มจับหน้าจอ + ตรวจ Monster"
+        );
+
+        capture.setOnClickListener(
+            v -> requestCapture()
+        );
+
+        root.addView(capture);
+
+        search =
+            new EditText(this);
+
+        search.setHint(
+            "พิมพ์ชื่อ เช่น Poring"
+        );
+
+        search.setTextColor(Color.WHITE);
+        search.setHintTextColor(Color.GRAY);
+
+        root.addView(search);
+
+        Button find =
+            new Button(this);
+
+        find.setText(
+            "ค้นหา Monster"
+        );
+
+        find.setOnClickListener(
+            v -> renderMonsters()
+        );
+
+        root.addView(find);
+
+        monsterList =
+            new LinearLayout(this);
+
+        monsterList.setOrientation(
+            LinearLayout.VERTICAL
+        );
+
+        root.addView(monsterList);
+
+        Button stop =
+            new Button(this);
+
+        stop.setText(
+            "หยุดบอท"
+        );
+
+        stop.setOnClickListener(
+            v ->
+                stopService(
+                    new Intent(
+                        this,
+                        CaptureService.class
+                    )
+                )
+        );
+
+        root.addView(stop);
+
+        ScrollView scroll =
+            new ScrollView(this);
+
+        scroll.addView(root);
+
+        setContentView(scroll);
+
+        renderMonsters();
+    }
+
+    private void renderMonsters() {
+
+        monsterList.removeAllViews();
+
+        String query =
+            search.getText().toString();
+
+        int count = 0;
+
+        for (
+            MonsterDatabase.M monster :
+            database.search(query)
+        ) {
+
+            CheckBox box =
+                new CheckBox(this);
+
+            box.setText(
+                monster.name
+                + " ["
+                + monster.id
+                + "]"
+            );
+
+            box.setTextColor(Color.WHITE);
+
+            box.setChecked(
+                selected.contains(monster)
+            );
+
+            box.setOnCheckedChangeListener(
+                (button, checked) -> {
+
+                    if (
+                        checked &&
+                        !selected.contains(monster)
+                    ) {
+                        selected.add(monster);
+                    }
+
+                    if (!checked) {
+                        selected.remove(monster);
+                    }
+                }
+            );
+
+            monsterList.addView(box);
+
+            count++;
+
+            if (count >= 100) {
+                break;
+            }
+        }
+    }
+
+    private void requestCapture() {
+
+        if (selected.isEmpty()) {
+
+            status.setText(
+                "สถานะ: เลือก Monster ก่อน เช่น Poring"
+            );
+
+            return;
+        }
+
+        ArrayList<String> names =
+            new ArrayList<>();
+
+        for (
+            MonsterDatabase.M monster :
+            selected
+        ) {
+            names.add(
+                monster.name
+            );
+        }
+
+        CaptureService.targets =
+            new HashSet<>(names);
+
+        MediaProjectionManager manager =
+            (MediaProjectionManager)
+            getSystemService(
+                MEDIA_PROJECTION_SERVICE
+            );
+
+        startActivityForResult(
+            manager.createScreenCaptureIntent(),
+            9001
+        );
+    }
+
+    @Override
+    protected void onActivityResult(
+        int requestCode,
+        int resultCode,
+        Intent data
+    ) {
+
+        super.onActivityResult(
+            requestCode,
+            resultCode,
+            data
+        );
+
+        if (
+            requestCode == 9001 &&
+            resultCode == RESULT_OK
+        ) {
+
+            Intent intent =
+                new Intent(
+                    this,
+                    CaptureService.class
+                );
+
+            intent.putExtra(
+                CaptureService.EXTRA_RESULT,
+                resultCode
+            );
+
+            intent.putExtra(
+                CaptureService.EXTRA_DATA,
+                data
+            );
+
+            startForegroundService(
+                intent
+            );
+
+            status.setText(
+                "สถานะ: กำลังหา "
+                + CaptureService.targets
+            );
+        }
+    }
+
+    static void postStatus(
+        String message
+    ) {
+
+        if (instance != null) {
+
+            instance.runOnUiThread(
+                () ->
+                    instance.status.setText(
+                        "สถานะ: "
+                        + message
+                    )
+            );
+        }
+    }
+}
+EOF
+
+      - name: Install Gradle
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL \
+            -o /tmp/gradle.zip \
+            https://services.gradle.org/distributions/gradle-8.10.2-bin.zip
+          unzip -q /tmp/gradle.zip -d /tmp
+          echo "/tmp/gradle-8.10.2/bin" >> "$GITHUB_PATH"
+
+      - name: Build APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon --stacktrace :app:assembleDebug
+
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: DustinBot-RuneClassic-OCR-V1-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
